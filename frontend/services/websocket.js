@@ -100,7 +100,7 @@ class WebSocketService {
       try {
         cb(data);
       } catch (e) {
-        console.error('WebSocket listener error [' + String(event) + ']:', e);
+        console.error('WebSocket listener error:', e);
       }
     });
   }
