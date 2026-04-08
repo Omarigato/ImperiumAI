@@ -80,6 +80,7 @@ class GeminiClient:
             "target": "unknown",
             "authorized": authorized,
             "reasoning": "Response could not be parsed as structured JSON.",
+            # authorized is kept as-is from above parse attempt
         }
 
     def _simulated_response(self, prompt: str) -> dict:
@@ -112,7 +113,7 @@ class GeminiClient:
             "action": "query",
             "target": "system",
             "authorized": True,
-            "reasoning": "Request appears legitimate and within authorised parameters.",
+            "reasoning": "Request appears legitimate and within authorized parameters.",
         }
 
     def execute_command(self, prompt: str) -> dict:
