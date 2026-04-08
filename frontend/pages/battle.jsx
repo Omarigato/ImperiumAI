@@ -197,6 +197,7 @@ export default function BattlePage() {
   };
 
   const agentColor = AGENTS_META.find((a) => a.name === activeAgent)?.color;
+  const promptAgentColor = AGENTS_META.find((a) => a.name === lastPrompt?.agent)?.color || '#FF0000';
 
   return (
     <div className="min-h-screen bg-bg-dark grid-bg text-white font-mono flex flex-col">
@@ -317,12 +318,12 @@ export default function BattlePage() {
 
           {/* Last attack prompt panel */}
           {lastPrompt && (
-            <div className="cyber-panel rounded text-xs" style={{ borderColor: '#FF000033' }}>
+            <div className="cyber-panel rounded text-xs" style={{ borderColor: `${promptAgentColor}33` }}>
               <button
                 onClick={() => setShowPrompt((p) => !p)}
                 className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-white/5 transition-colors"
               >
-                <span style={{ color: agentColor || '#FF0000' }}>
+                <span style={{ color: promptAgentColor }}>
                   ⚠ LAST PROMPT — {lastPrompt.agent} [{lastPrompt.tactic}] → {lastPrompt.target}
                 </span>
                 <span className="text-gray-600">{showPrompt ? '▲' : '▼'}</span>
@@ -337,7 +338,7 @@ export default function BattlePage() {
                   >
                     <pre
                       className="px-3 pb-3 text-gray-400 whitespace-pre-wrap break-all leading-relaxed border-t"
-                      style={{ borderColor: '#FF000022', maxHeight: 120, overflowY: 'auto' }}
+                      style={{ borderColor: `${promptAgentColor}22`, maxHeight: 120, overflowY: 'auto' }}
                     >
                       {lastPrompt.text}
                     </pre>
