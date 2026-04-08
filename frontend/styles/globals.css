@@ -4,82 +4,82 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Base reset ───────────────────────────────────────────────── */
-*, *::before, *::after {
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body {
+html,
+body,
+#__next {
   height: 100%;
   background-color: #0A0A0F;
   color: #E0E0E0;
   font-family: 'Share Tech Mono', 'Courier New', monospace;
-  overflow-x: hidden;
+  overflow: hidden;
+  /* prevent page-level scroll on battle page */
 }
 
-#__next {
-  min-height: 100vh;
-}
-
-/* ── Scrollbar ────────────────────────────────────────────────── */
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
+
 ::-webkit-scrollbar-track {
   background: #0A0A0F;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #00FFFF44;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #00FFFFAA;
+  background: #00FFFF33;
+  border-radius: 2px;
 }
 
-/* ── Grid background ──────────────────────────────────────────── */
+::-webkit-scrollbar-thumb:hover {
+  background: #00FFFF88;
+}
+
+/* ── Non-battle pages need scroll ────────────────────────────────────────── */
+.page-scroll {
+  overflow-y: auto !important;
+  height: auto !important;
+}
+
+/* ── Grid background ──────────────────────────────────────────────────────── */
 .grid-bg {
   background-image:
-    linear-gradient(rgba(0, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 255, 255, 0.04) 1px, transparent 1px);
+    linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
-/* ── Glow text ────────────────────────────────────────────────── */
+/* ── Glow texts ───────────────────────────────────────────────────────────── */
 .glow-text {
   color: #00FFFF;
-  text-shadow:
-    0 0 7px #00FFFF,
-    0 0 14px #00FFFF,
-    0 0 28px #00FFFF;
-  animation: glow-pulse 2s ease-in-out infinite;
+  text-shadow: 0 0 7px #00FFFF, 0 0 14px #00FFFF;
+  animation: glow-pulse 2.5s ease-in-out infinite;
 }
 
 .glow-text-red {
-  color: #FF0000;
-  text-shadow:
-    0 0 7px #FF0000,
-    0 0 14px #FF0000,
-    0 0 28px #FF0000;
+  color: #FF2222;
+  text-shadow: 0 0 7px #FF2222, 0 0 14px #FF2222;
 }
 
 .glow-text-purple {
   color: #9B00FF;
-  text-shadow:
-    0 0 7px #9B00FF,
-    0 0 14px #9B00FF;
+  text-shadow: 0 0 7px #9B00FF, 0 0 14px #9B00FF;
 }
 
 .glow-text-green {
   color: #00FF41;
-  text-shadow:
-    0 0 7px #00FF41,
-    0 0 14px #00FF41;
+  text-shadow: 0 0 7px #00FF41, 0 0 14px #00FF41;
 }
 
-/* ── Cyber panel ──────────────────────────────────────────────── */
+/* ── Cyber panel ──────────────────────────────────────────────────────────── */
 .cyber-panel {
   background: #0F0F1A;
   border: 1px solid #1A1A2E;
@@ -94,35 +94,11 @@ html, body {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, #00FFFF88, transparent);
-  animation: scan-line 4s linear infinite;
+  background: linear-gradient(90deg, transparent, #00FFFF66, transparent);
+  animation: scan-line 5s linear infinite;
 }
 
-.cyber-panel-red {
-  border-color: #FF000044;
-}
-
-.cyber-panel-red::before {
-  background: linear-gradient(90deg, transparent, #FF000088, transparent);
-}
-
-/* ── Neon borders ─────────────────────────────────────────────── */
-.neon-border-cyan {
-  border: 1px solid #00FFFF44;
-  box-shadow: 0 0 8px #00FFFF22, inset 0 0 8px #00FFFF11;
-}
-
-.neon-border-red {
-  border: 1px solid #FF000044;
-  box-shadow: 0 0 8px #FF000022, inset 0 0 8px #FF000011;
-}
-
-.neon-border-purple {
-  border: 1px solid #9B00FF44;
-  box-shadow: 0 0 8px #9B00FF22, inset 0 0 8px #9B00FF11;
-}
-
-/* ── Scanning line animation ──────────────────────────────────── */
+/* ── Scan overlay (full page) ─────────────────────────────────────────────── */
 .scan-overlay {
   pointer-events: none;
   position: fixed;
@@ -136,67 +112,35 @@ html, body {
   position: absolute;
   width: 100%;
   height: 2px;
-  background: linear-gradient(
-    to right,
-    transparent,
-    rgba(0, 255, 255, 0.15),
-    transparent
-  );
-  animation: scan 6s linear infinite;
+  background: linear-gradient(to right, transparent, rgba(0, 255, 255, 0.12), transparent);
+  animation: scan 7s linear infinite;
   top: -2px;
 }
 
-/* ── Animations ───────────────────────────────────────────────── */
-@keyframes glow-pulse {
-  0%, 100% {
-    text-shadow: 0 0 7px #00FFFF, 0 0 14px #00FFFF;
-  }
-  50% {
-    text-shadow: 0 0 14px #00FFFF, 0 0 28px #00FFFF, 0 0 56px #00FFFF;
-  }
+/* ── Custom utility: w-68 ─────────────────────────────────────────────────── */
+.w-68 {
+  width: 17rem;
+  /* 272px */
 }
 
-@keyframes scan {
-  0% { transform: translateY(-4px); }
-  100% { transform: translateY(100vh); }
+/* ── Neon borders ─────────────────────────────────────────────────────────── */
+.neon-border-cyan {
+  border: 1px solid #00FFFF44;
+  box-shadow: 0 0 8px #00FFFF22, inset 0 0 8px #00FFFF11;
 }
 
-@keyframes scan-line {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+.neon-border-red {
+  border: 1px solid #FF222244;
+  box-shadow: 0 0 8px #FF222222, inset 0 0 8px #FF222211;
 }
 
-@keyframes flicker {
-  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
-  20%, 24%, 55% { opacity: 0.4; }
-}
-
-@keyframes pulse-red {
-  0%, 100% { box-shadow: 0 0 5px #FF0000, 0 0 10px #FF0000; }
-  50% { box-shadow: 0 0 20px #FF0000, 0 0 40px #FF0000, 0 0 80px #FF0000; }
-}
-
-@keyframes border-run {
-  0%, 100% { border-color: #00FFFF44; }
-  50% { border-color: #00FFFF; }
-}
-
-/* ── Particle canvas ─────────────────────────────────────────── */
-.particle-canvas {
-  position: fixed;
-  top: 0;
-  left: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* ── Button styles ───────────────────────────────────────────── */
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
 .btn-cyber {
   font-family: 'Share Tech Mono', monospace;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
   position: relative;
   overflow: hidden;
 }
@@ -205,20 +149,102 @@ html, body {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(255,255,255,0.05);
+  background: rgba(255, 255, 255, 0.06);
   transform: translateX(-100%);
-  transition: transform 0.3s ease;
+  transition: transform 0.25s ease;
 }
 
 .btn-cyber:hover::after {
   transform: translateX(0);
 }
 
-/* ── Log entry colors ────────────────────────────────────────── */
-.log-attack    { color: #FF4444; }
-.log-gemini    { color: #CC66FF; }
-.log-policy    { color: #FFCC00; }
-.log-iot       { color: #00CCFF; }
-.log-risk      { color: #FF8800; }
-.log-system    { color: #00FF41; }
-.log-warning   { color: #FF8800; }
+/* ── Particle canvas ──────────────────────────────────────────────────────── */
+.particle-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Log colors ───────────────────────────────────────────────────────────── */
+.log-attack {
+  color: #FF4444;
+}
+
+.log-llm {
+  color: #CC66FF;
+}
+
+.log-policy {
+  color: #FFCC00;
+}
+
+.log-iot {
+  color: #00CCFF;
+}
+
+.log-risk {
+  color: #FF8800;
+}
+
+.log-system {
+  color: #00FF41;
+}
+
+.log-warning {
+  color: #FF8800;
+}
+
+/* ── Animations ───────────────────────────────────────────────────────────── */
+@keyframes glow-pulse {
+
+  0%,
+  100% {
+    text-shadow: 0 0 7px #00FFFF, 0 0 14px #00FFFF;
+  }
+
+  50% {
+    text-shadow: 0 0 14px #00FFFF, 0 0 28px #00FFFF, 0 0 56px #00FFFF;
+  }
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-4px);
+  }
+
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+@keyframes scan-line {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes flicker {
+
+  0%,
+  19%,
+  21%,
+  23%,
+  25%,
+  54%,
+  56%,
+  100% {
+    opacity: 1;
+  }
+
+  20%,
+  24%,
+  55% {
+    opacity: 0.4;
+  }
+}

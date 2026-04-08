@@ -1,407 +1,536 @@
-import { useRef, useMemo } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+/**
+ * SmartHome3D — High-quality 3D visualization for AegisAI
+ * Features:
+ *  - Detailed smart home with real architectural geometry
+ *  - Animated AI agents that move toward their targets when attacking
+ *  - Attack beam with particle trail
+ *  - Device nodes with glowing state indicators
+ *  - Atmospheric lighting + fog
+ */
+import { useRef, useMemo, useEffect, useState } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 
-function Floor() {
-  return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
-      <planeGeometry args={[16, 16]} />
-      <meshStandardMaterial color="#1a1a0e" roughness={0.9} />
-    </mesh>
-  );
+// ── Constants ─────────────────────────────────────────────────────────────────
+const AGENT_HOME_POSITIONS = {
+  ShadowInjector: [-8.5, 0, 1],
+  ContextPhantom: [-8.5, 0, -1.5],
+  PrivilegeReaper: [-8.5, 0, 3.5],
+  SilentEscalator: [-8.5, 0, -4],
+  NetworkPhantom: [-8.5, 0, -6],
+};
+
+const DEVICE_POSITIONS = {
+  front_door: [0, 0.9, 2.5],
+  camera_system: [2.4, 2.1, 1.9],
+  lights: [0, 2.9, 0],
+  thermostat: [2.45, 1.2, 0],
+  security_panel: [-2.45, 1.3, -0.5],
+  alarm: [0.5, 2.5, -2.05],
+  router: [-5, 0.6, -3.5],
+};
+
+const AGENT_COLORS = {
+  ShadowInjector: '#FF2222',
+  ContextPhantom: '#9B00FF',
+  PrivilegeReaper: '#FF6600',
+  SilentEscalator: '#00FFFF',
+  NetworkPhantom: '#00FF88',
+};
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function useAnimatedValue(target, speed = 0.08) {
+  const ref = useRef(target);
+  useFrame(() => { ref.current += (target - ref.current) * speed; });
+  return ref;
 }
 
-function Fence({ x, z, rotY = 0 }) {
-  return (
-    <group position={[x, 0, z]} rotation={[0, rotY, 0]}>
-      <mesh position={[0, 0.4, 0]}>
-        <boxGeometry args={[2, 0.8, 0.08]} />
-        <meshStandardMaterial color="#8B6914" roughness={0.9} />
-      </mesh>
-      <mesh position={[-0.9, 0.7, 0]}>
-        <boxGeometry args={[0.1, 1.4, 0.1]} />
-        <meshStandardMaterial color="#6B4F10" roughness={0.9} />
-      </mesh>
-      <mesh position={[0.9, 0.7, 0]}>
-        <boxGeometry args={[0.1, 1.4, 0.1]} />
-        <meshStandardMaterial color="#6B4F10" roughness={0.9} />
-      </mesh>
-    </group>
-  );
-}
+// ── Scene objects ─────────────────────────────────────────────────────────────
 
-function GridLines() {
-  const points = useMemo(() => {
-    const pts = [];
-    for (let i = -6; i <= 6; i++) {
-      pts.push(new THREE.Vector3(-6, 0, i), new THREE.Vector3(6, 0, i));
-      pts.push(new THREE.Vector3(i, 0, -6), new THREE.Vector3(i, 0, 6));
-    }
-    return pts;
-  }, []);
-
-  const geometry = useMemo(() => {
-    const geo = new THREE.BufferGeometry().setFromPoints(points);
-    return geo;
-  }, [points]);
-
-  return (
-    <lineSegments geometry={geometry}>
-      <lineBasicMaterial color="#00FFFF" opacity={0.08} transparent />
-    </lineSegments>
-  );
-}
-
+/** Detailed house geometry */
 function House() {
   return (
-    <group position={[0, 0, 0]}>
-      {/* Main walls — warm beige/cream */}
-      <mesh position={[0, 1.2, 0]} castShadow>
-        <boxGeometry args={[5, 2.4, 4]} />
-        <meshStandardMaterial color="#D4B896" roughness={0.8} metalness={0.05} />
-      </mesh>
-      {/* Roof — terracotta red */}
-      <mesh position={[0, 2.9, 0]} rotation={[0, Math.PI / 4, 0]}>
-        <coneGeometry args={[3.2, 1.2, 4]} />
-        <meshStandardMaterial color="#C0522A" roughness={0.85} />
-      </mesh>
-      {/* Floor platform — concrete gray */}
-      <mesh position={[0, 0.05, 0]}>
-        <boxGeometry args={[5.4, 0.1, 4.4]} />
+    <group>
+      {/* Foundation */}
+      <mesh position={[0, 0.06, 0]} receiveShadow>
+        <boxGeometry args={[5.6, 0.12, 4.6]} />
         <meshStandardMaterial color="#8A8A7A" roughness={1} />
       </mesh>
-      {/* Door (front) */}
-      <mesh position={[0, 0.9, 2.01]}>
-        <boxGeometry args={[0.9, 1.8, 0.05]} />
-        <meshStandardMaterial color="#5C3A1E" roughness={0.7} metalness={0.1} />
+
+      {/* Main walls */}
+      <mesh position={[0, 1.2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[5, 2.4, 4]} />
+        <meshStandardMaterial color="#D4C4A8" roughness={0.85} metalness={0.02} />
       </mesh>
-      {/* Windows */}
-      <mesh position={[-1.5, 1.4, 2.02]}>
-        <boxGeometry args={[0.8, 0.7, 0.04]} />
-        <meshStandardMaterial color="#88CCEE" roughness={0.1} metalness={0.5} transparent opacity={0.7} />
+
+      {/* Roof base */}
+      <mesh position={[0, 2.4, 0]} castShadow>
+        <boxGeometry args={[5.4, 0.12, 4.4]} />
+        <meshStandardMaterial color="#5A4A3A" roughness={0.9} />
       </mesh>
-      <mesh position={[1.5, 1.4, 2.02]}>
-        <boxGeometry args={[0.8, 0.7, 0.04]} />
-        <meshStandardMaterial color="#88CCEE" roughness={0.1} metalness={0.5} transparent opacity={0.7} />
+
+      {/* Roof pyramid */}
+      <mesh position={[0, 3.1, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
+        <coneGeometry args={[3.4, 1.4, 4]} />
+        <meshStandardMaterial color="#C0522A" roughness={0.85} />
       </mesh>
-      {/* Garage — dark gray */}
-      <mesh position={[4.2, 0.7, 0]} castShadow>
-        <boxGeometry args={[2.4, 1.4, 3.2]} />
+
+      {/* Roof ridge tile */}
+      <mesh position={[0, 3.82, 0]}>
+        <boxGeometry args={[0.2, 0.1, 0.2]} />
+        <meshStandardMaterial color="#8B4513" roughness={0.9} />
+      </mesh>
+
+      {/* Front door frame */}
+      <mesh position={[0, 1.0, 2.03]}>
+        <boxGeometry args={[1.1, 2.1, 0.04]} />
+        <meshStandardMaterial color="#4A2F1A" roughness={0.7} />
+      </mesh>
+      {/* Door */}
+      <mesh position={[0, 0.95, 2.05]}>
+        <boxGeometry args={[0.9, 1.85, 0.05]} />
+        <meshStandardMaterial color="#6B3A1E" roughness={0.6} metalness={0.1} />
+      </mesh>
+      {/* Door handle */}
+      <mesh position={[0.35, 0.95, 2.09]}>
+        <sphereGeometry args={[0.04, 8, 8]} />
+        <meshStandardMaterial color="#C0A060" metalness={0.9} roughness={0.1} />
+      </mesh>
+
+      {/* Windows — front */}
+      {[-1.5, 1.5].map(x => (
+        <group key={x} position={[x, 1.4, 2.03]}>
+          <mesh>
+            <boxGeometry args={[0.9, 0.8, 0.04]} />
+            <meshStandardMaterial color="#3A3A4A" roughness={0.3} />
+          </mesh>
+          <mesh position={[0, 0, 0.02]}>
+            <boxGeometry args={[0.8, 0.7, 0.02]} />
+            <meshStandardMaterial color="#88CCEE" roughness={0.05} metalness={0.5} transparent opacity={0.65} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Side windows */}
+      {[-1, 1].map(z => (
+        <mesh key={z} position={[2.52, 1.4, z]}>
+          <boxGeometry args={[0.04, 0.7, 0.8]} />
+          <meshStandardMaterial color="#88CCEE" roughness={0.05} metalness={0.5} transparent opacity={0.6} />
+        </mesh>
+      ))}
+
+      {/* Chimney */}
+      <mesh position={[1.5, 3.5, -0.5]} castShadow>
+        <boxGeometry args={[0.4, 1.2, 0.4]} />
+        <meshStandardMaterial color="#8B4513" roughness={0.9} />
+      </mesh>
+
+      {/* Garage */}
+      <mesh position={[4.2, 0.8, 0]} castShadow receiveShadow>
+        <boxGeometry args={[2.6, 1.6, 3.4]} />
         <meshStandardMaterial color="#7A7A6A" roughness={0.9} />
       </mesh>
-      {/* Garage door */}
-      <mesh position={[5.35, 0.7, 0]}>
-        <boxGeometry args={[0.05, 1.2, 2.8]} />
-        <meshStandardMaterial color="#555555" roughness={0.6} metalness={0.3} />
-      </mesh>
-      {/* Garage roof */}
-      <mesh position={[4.2, 1.55, 0]}>
-        <boxGeometry args={[2.5, 0.2, 3.4]} />
+      <mesh position={[4.2, 1.68, 0]}>
+        <boxGeometry args={[2.7, 0.16, 3.5]} />
         <meshStandardMaterial color="#5A5A50" roughness={1} />
       </mesh>
+      {/* Garage door panels */}
+      {[-0.5, 0.5].map(z => (
+        <mesh key={z} position={[5.49, 0.8, z]}>
+          <boxGeometry args={[0.04, 1.35, 0.95]} />
+          <meshStandardMaterial color="#888" roughness={0.4} metalness={0.5} />
+        </mesh>
+      ))}
+
+      {/* Pathway */}
+      <mesh position={[0, 0.02, 4]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[1.2, 3]} />
+        <meshStandardMaterial color="#A09080" roughness={1} />
+      </mesh>
+
+      {/* Garden hedge */}
+      {[-2.2, 2.2].map((x, i) => (
+        <mesh key={i} position={[x, 0.5, 3.5]} castShadow>
+          <boxGeometry args={[0.5, 1, 3]} />
+          <meshStandardMaterial color="#2D5A27" roughness={0.95} />
+        </mesh>
+      ))}
     </group>
   );
 }
 
-function FenceRow() {
+/** Atmospheric ground */
+function Ground() {
+  return (
+    <>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+        <planeGeometry args={[24, 24]} />
+        <meshStandardMaterial color="#1E2A1A" roughness={0.98} />
+      </mesh>
+      {/* Subtle grid */}
+      <gridHelper args={[24, 24, '#00FFFF', '#00FFFF']} position={[0, 0.01, 0]}>
+        <lineBasicMaterial color="#00FFFF" transparent opacity={0.06} />
+      </gridHelper>
+    </>
+  );
+}
+
+/** Perimeter fence */
+function PerimeterFence() {
+  const postPositions = useMemo(() => {
+    const posts = [];
+    const size = 7;
+    for (let i = -size; i <= size; i += 2) {
+      posts.push([-size, 0, i], [size, 0, i], [i, 0, -size], [i, 0, size]);
+    }
+    return posts;
+  }, []);
+
   return (
     <group>
-      {/* Front fence */}
-      {[-4, -2, 0, 2, 4].map((x) => (
-        <Fence key={`f${x}`} x={x} z={5.5} />
-      ))}
-      {/* Back fence */}
-      {[-4, -2, 0, 2, 4].map((x) => (
-        <Fence key={`b${x}`} x={x} z={-5.5} />
-      ))}
-      {/* Left fence */}
-      {[-4, -2, 0, 2, 4].map((z) => (
-        <Fence key={`l${z}`} x={-5.5} z={z} rotY={Math.PI / 2} />
-      ))}
-      {/* Right fence */}
-      {[-4, -2, 0, 2, 4].map((z) => (
-        <Fence key={`r${z}`} x={6.5} z={z} rotY={Math.PI / 2} />
+      {postPositions.map(([x, , z], idx) => (
+        <mesh key={idx} position={[x, 0.6, z]} castShadow>
+          <cylinderGeometry args={[0.05, 0.06, 1.2, 6]} />
+          <meshStandardMaterial color="#5A4030" roughness={0.9} />
+        </mesh>
       ))}
     </group>
   );
 }
 
-function DeviceNode({ position, color, emissive, label, shape, compromised, defended }) {
+/** IoT device node with status glow */
+function DeviceNode({ deviceId, compromised, defended }) {
   const meshRef = useRef();
+  const ringRef = useRef();
+  const position = DEVICE_POSITIONS[deviceId];
+  if (!position) return null;
+
+  const baseColor = compromised ? '#FF0000' : defended ? '#00FF41' : '#00FFFF';
+  const emissive = compromised ? '#AA0000' : defended ? '#00AA20' : '#002244';
 
   useFrame(({ clock }) => {
-    if (!meshRef.current) return;
-    if (compromised) {
-      meshRef.current.material.emissiveIntensity =
-        0.6 + Math.sin(clock.getElapsedTime() * 8) * 0.4;
-    } else if (defended) {
-      meshRef.current.material.emissiveIntensity =
-        0.3 + Math.sin(clock.getElapsedTime() * 3) * 0.2;
-    } else {
-      meshRef.current.material.emissiveIntensity = 0.15;
+    const t = clock.getElapsedTime();
+    if (meshRef.current) {
+      const intensity = compromised
+        ? 0.6 + Math.sin(t * 10) * 0.4
+        : defended
+          ? 0.4 + Math.sin(t * 4) * 0.2
+          : 0.1 + Math.sin(t * 1.5) * 0.05;
+      meshRef.current.material.emissiveIntensity = intensity;
+    }
+    if (ringRef.current) {
+      ringRef.current.rotation.z = t * (compromised ? 3 : 1);
+      ringRef.current.material.opacity = (compromised || defended) ? 0.6 + Math.sin(t * 5) * 0.3 : 0;
     }
   });
-
-  const emissiveColor = compromised ? '#FF0000' : defended ? '#00FF41' : emissive;
 
   return (
     <group position={position}>
+      {/* Device orb */}
       <mesh ref={meshRef} castShadow>
-        {shape === 'sphere' && <sphereGeometry args={[0.2, 16, 16]} />}
-        {shape === 'box' && <boxGeometry args={[0.3, 0.3, 0.3]} />}
-        {shape === 'cylinder' && <cylinderGeometry args={[0.15, 0.15, 0.4, 8]} />}
-        {shape === 'cone' && <coneGeometry args={[0.2, 0.35, 6]} />}
-        {!shape && <boxGeometry args={[0.25, 0.25, 0.25]} />}
+        <icosahedronGeometry args={[0.18, 1]} />
         <meshStandardMaterial
-          color={color}
-          emissive={emissiveColor}
-          emissiveIntensity={0.15}
-          roughness={0.3}
-          metalness={0.7}
+          color={baseColor}
+          emissive={emissive}
+          emissiveIntensity={0.1}
+          roughness={0.2}
+          metalness={0.8}
         />
       </mesh>
-      {/* Glow ring when attacked */}
-      {compromised && (
-        <mesh>
-          <torusGeometry args={[0.35, 0.04, 8, 24]} />
-          <meshBasicMaterial color="#FF0000" transparent opacity={0.7} />
-        </mesh>
-      )}
-      {/* Shield ring when defended */}
-      {defended && (
-        <mesh>
-          <torusGeometry args={[0.35, 0.04, 8, 24]} />
-          <meshBasicMaterial color="#00FF41" transparent opacity={0.7} />
-        </mesh>
+
+      {/* Orbit ring */}
+      <mesh ref={ringRef}>
+        <torusGeometry args={[0.3, 0.025, 8, 32]} />
+        <meshBasicMaterial color={baseColor} transparent opacity={0} />
+      </mesh>
+
+      {/* Point light when active */}
+      {(compromised || defended) && (
+        <pointLight
+          color={baseColor}
+          intensity={compromised ? 1.5 : 0.8}
+          distance={1.5}
+        />
       )}
     </group>
   );
 }
 
-function AttackBeam({ active, success }) {
-  const beamRef = useRef();
+/** AI Agent humanoid figure that moves toward its target */
+function AgentFigure({ name, isActive, activeAttack }) {
+  const groupRef = useRef();
+  const colorHex = AGENT_COLORS[name] || '#FF2222';
+  const homePos = AGENT_HOME_POSITIONS[name] || [-8.5, 0, 0];
+
+  // Determine target position
+  const targetPos = useMemo(() => {
+    if (isActive && activeAttack?.target && DEVICE_POSITIONS[activeAttack.target]) {
+      const dp = DEVICE_POSITIONS[activeAttack.target];
+      // Stand 2.5 units in front of the device
+      return [dp[0] - 2.5, 0, dp[2]];
+    }
+    return homePos;
+  }, [isActive, activeAttack, homePos]);
+
+  const posRef = useRef(new THREE.Vector3(...homePos));
+  const t = useRef(0);
 
   useFrame(({ clock }) => {
-    if (!beamRef.current) return;
-    beamRef.current.material.opacity = active
-      ? 0.4 + Math.sin(clock.getElapsedTime() * 20) * 0.3
-      : 0;
+    const elapsed = clock.getElapsedTime();
+    if (!groupRef.current) return;
+
+    // Smooth movement toward target
+    const dest = new THREE.Vector3(...targetPos);
+    posRef.current.lerp(dest, 0.04);
+    groupRef.current.position.copy(posRef.current);
+
+    // Look toward target device (only when attacking)
+    if (isActive && activeAttack?.target && DEVICE_POSITIONS[activeAttack.target]) {
+      const look = new THREE.Vector3(...DEVICE_POSITIONS[activeAttack.target]);
+      look.y = groupRef.current.position.y;
+      groupRef.current.lookAt(look);
+    } else {
+      groupRef.current.rotation.y = 0;
+    }
+
+    // Idle bob
+    groupRef.current.position.y = posRef.current.y + Math.sin(elapsed * 1.5 + name.length) * 0.03;
+
+    // Attack sway
+    if (isActive) {
+      groupRef.current.position.y += Math.sin(elapsed * 8) * 0.04;
+    }
   });
 
-  if (!active) return null;
-
-  const color = success ? '#FF0000' : '#00AAFF';
-  const points = [
-    new THREE.Vector3(-5, 1.5, 0),
-    new THREE.Vector3(0, 1, 0),
-    new THREE.Vector3(2, 0.5, 0),
-  ];
-  const curve = new THREE.CatmullRomCurve3(points);
-  const tubePoints = curve.getPoints(20);
-  const geometry = new THREE.BufferGeometry().setFromPoints(tubePoints);
-
   return (
-    <line ref={beamRef} geometry={geometry}>
-      <lineBasicMaterial color={color} transparent opacity={0.7} linewidth={2} />
-    </line>
+    <group ref={groupRef}>
+      {/* Head */}
+      <mesh position={[0, 1.65, 0]} castShadow>
+        <dodecahedronGeometry args={[0.18, 0]} />
+        <meshStandardMaterial
+          color={colorHex}
+          emissive={colorHex}
+          emissiveIntensity={isActive ? 0.9 : 0.3}
+          roughness={0.3} metalness={0.5}
+        />
+      </mesh>
+
+      {/* Visor glow */}
+      <mesh position={[0, 1.65, 0.15]}>
+        <boxGeometry args={[0.2, 0.06, 0.02]} />
+        <meshBasicMaterial color={colorHex} transparent opacity={isActive ? 0.9 : 0.4} />
+      </mesh>
+
+      {/* Torso */}
+      <mesh position={[0, 1.1, 0]} castShadow>
+        <boxGeometry args={[0.3, 0.65, 0.18]} />
+        <meshStandardMaterial color={colorHex} emissive={colorHex} emissiveIntensity={isActive ? 0.5 : 0.15} roughness={0.5} metalness={0.4} />
+      </mesh>
+
+      {/* Chest plate */}
+      <mesh position={[0, 1.1, 0.1]}>
+        <boxGeometry args={[0.2, 0.4, 0.02]} />
+        <meshBasicMaterial color={colorHex} transparent opacity={0.7} />
+      </mesh>
+
+      {/* Arms */}
+      {[-0.24, 0.24].map((x, i) => (
+        <mesh key={i} position={[x, 1.1, 0]} rotation={[0, 0, x > 0 ? -0.3 : 0.3]} castShadow>
+          <capsuleGeometry args={[0.055, 0.45, 4, 8]} />
+          <meshStandardMaterial color={colorHex} emissive={colorHex} emissiveIntensity={0.2} roughness={0.6} />
+        </mesh>
+      ))}
+
+      {/* Legs */}
+      {[-0.1, 0.1].map((x, i) => (
+        <mesh key={i} position={[x, 0.55, 0]} castShadow>
+          <capsuleGeometry args={[0.06, 0.5, 4, 8]} />
+          <meshStandardMaterial color={colorHex} emissive={colorHex} emissiveIntensity={0.15} roughness={0.6} />
+        </mesh>
+      ))}
+
+      {/* Aura sphere */}
+      <mesh>
+        <sphereGeometry args={[0.45, 12, 12]} />
+        <meshBasicMaterial color={colorHex} transparent opacity={isActive ? 0.12 : 0.04} />
+      </mesh>
+
+      {/* Active attack point light */}
+      {isActive && (
+        <pointLight color={colorHex} intensity={2} distance={3} decay={2} />
+      )}
+    </group>
   );
 }
 
+/** Attack beam with particle effect */
+function AttackBeam({ activeAttack, activeAgent }) {
+  const lineRef = useRef();
+  const particles = useRef([]);
+  const groupRef = useRef();
+
+  const agentColor = AGENT_COLORS[activeAgent] || '#FF2222';
+
+  const targetPos = useMemo(() => {
+    if (activeAttack?.target) return new THREE.Vector3(...(DEVICE_POSITIONS[activeAttack.target] || [0, 1, 0]));
+    return new THREE.Vector3(0, 1, 0);
+  }, [activeAttack?.target]);
+
+  // Build beam points from agent position
+  const curve = useMemo(() => {
+    const home = new THREE.Vector3(...(AGENT_HOME_POSITIONS[activeAgent] || [-8, 0, 0]));
+    const mid = home.clone().lerp(targetPos, 0.5).add(new THREE.Vector3(0, 1.5, 0));
+    return new THREE.CatmullRomCurve3([
+      home.clone().add(new THREE.Vector3(0, 1.2, 0)),
+      mid,
+      targetPos.clone(),
+    ]);
+  }, [activeAgent, targetPos]);
+
+  const tubeRef = useRef();
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (tubeRef.current) {
+      tubeRef.current.material.opacity = 0.5 + Math.sin(t * 20) * 0.3;
+      tubeRef.current.material.color.setHex(
+        activeAttack?.success === true ? parseInt(agentColor.replace('#', '0x')) :
+          activeAttack?.success === false ? 0x00AAFF : parseInt(agentColor.replace('#', '0x'))
+      );
+    }
+  });
+
+  if (!activeAttack || !activeAgent) return null;
+
+  const tubePoints = curve.getPoints(32);
+  const geo = new THREE.BufferGeometry().setFromPoints(tubePoints);
+
+  return (
+    <group ref={groupRef}>
+      <line ref={tubeRef} geometry={geo}>
+        <lineBasicMaterial color={agentColor} transparent opacity={0.7} linewidth={2} />
+      </line>
+      {/* Glow pulse at target */}
+      <mesh position={targetPos}>
+        <sphereGeometry args={[0.25, 12, 12]} />
+        <meshBasicMaterial color={agentColor} transparent opacity={0.4} />
+      </mesh>
+    </group>
+  );
+}
+
+/** Ambient particle field */
 function AmbientParticles() {
-  const count = 60;
+  const ref = useRef();
   const positions = useMemo(() => {
-    const arr = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      arr[i * 3] = (Math.random() - 0.5) * 10;
-      arr[i * 3 + 1] = Math.random() * 4;
-      arr[i * 3 + 2] = (Math.random() - 0.5) * 10;
+    const arr = new Float32Array(120 * 3);
+    for (let i = 0; i < 120; i++) {
+      arr[i * 3] = (Math.random() - 0.5) * 20;
+      arr[i * 3 + 1] = Math.random() * 5;
+      arr[i * 3 + 2] = (Math.random() - 0.5) * 20;
     }
     return arr;
   }, []);
 
-  const particleRef = useRef();
-
   useFrame(({ clock }) => {
-    if (!particleRef.current) return;
-    particleRef.current.rotation.y = clock.getElapsedTime() * 0.05;
+    if (ref.current) ref.current.rotation.y = clock.getElapsedTime() * 0.03;
   });
 
   return (
-    <points ref={particleRef}>
+    <points ref={ref}>
       <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          array={positions}
-          count={count}
-          itemSize={3}
-        />
+        <bufferAttribute attach="attributes-position" array={positions} count={120} itemSize={3} />
       </bufferGeometry>
-      <pointsMaterial color="#00FFFF" size={0.04} transparent opacity={0.4} />
+      <pointsMaterial color="#00FFFF" size={0.035} transparent opacity={0.35} sizeAttenuation />
     </points>
   );
 }
 
-const DEVICE_CONFIG = [
-  { id: 'front_door', label: 'Front Door', position: [0, 0.9, 2.5], color: '#8B4513', emissive: '#4A2008', shape: 'box' },
-  { id: 'camera_system', label: 'Camera', position: [2.4, 2.1, 1.9], color: '#2A2A2A', emissive: '#0000AA', shape: 'cone' },
-  { id: 'lights', label: 'Lights', position: [0, 2.9, 0], color: '#FFD700', emissive: '#FFCC00', shape: 'sphere' },
-  { id: 'thermostat', label: 'Thermostat', position: [2.45, 1.2, 0], color: '#E0E0E0', emissive: '#2244AA', shape: 'box' },
-  { id: 'security_panel', label: 'Panel', position: [-2.45, 1.3, -0.5], color: '#1A4A1A', emissive: '#00AA00', shape: 'cylinder' },
-  { id: 'alarm', label: 'Alarm', position: [0.5, 2.5, -2.05], color: '#AA0000', emissive: '#FF2200', shape: 'cylinder' },
-  { id: 'router', label: 'Router', position: [-4.5, 0.6, -3.5], color: '#0044AA', emissive: '#003388', shape: 'box' },
-];
-
-// Agent positions outside the house, approaching it
-const AGENT_POSITIONS = {
-  ShadowInjector:  [-7, 0, 1],
-  ContextPhantom:  [-7, 0, -2],
-  PrivilegeReaper: [-6, 0, 3.5],
-  SilentEscalator: [-5, 0, -4.5],
-  NetworkPhantom:  [-7, 0, -5],
-};
-
-function AgentBody({ name, color, isActive }) {
-  const groupRef = useRef();
-  const glowRef = useRef();
-
-  useFrame(({ clock }) => {
-    if (!groupRef.current) return;
-    const t = clock.getElapsedTime();
-    if (isActive) {
-      // Bob and lean forward when attacking
-      groupRef.current.position.y = Math.sin(t * 6) * 0.05;
-      groupRef.current.rotation.z = Math.sin(t * 4) * 0.08;
-    } else {
-      // Idle sway
-      groupRef.current.position.y = Math.sin(t * 1.2 + name.length) * 0.03;
-      groupRef.current.rotation.z = 0;
-    }
-    if (glowRef.current) {
-      glowRef.current.material.opacity = isActive
-        ? 0.5 + Math.sin(t * 8) * 0.3
-        : 0.15 + Math.sin(t * 1.5) * 0.1;
-    }
-  });
-
-  const basePos = AGENT_POSITIONS[name] || [-7, 0, 0];
-
+/** Atmospheric fog plane */
+function FogLayer() {
   return (
-    <group position={basePos}>
-      <group ref={groupRef}>
-        {/* Head */}
-        <mesh position={[0, 1.65, 0]} castShadow>
-          <sphereGeometry args={[0.18, 12, 12]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={isActive ? 0.8 : 0.3} roughness={0.4} metalness={0.3} />
-        </mesh>
-        {/* Body */}
-        <mesh position={[0, 1.1, 0]} castShadow>
-          <cylinderGeometry args={[0.12, 0.14, 0.7, 8]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={isActive ? 0.6 : 0.2} roughness={0.5} metalness={0.2} />
-        </mesh>
-        {/* Left arm */}
-        <mesh position={[-0.22, 1.15, 0]} rotation={[0, 0, isActive ? 0.6 : 0.3]}>
-          <cylinderGeometry args={[0.05, 0.05, 0.5, 6]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.2} roughness={0.6} />
-        </mesh>
-        {/* Right arm */}
-        <mesh position={[0.22, 1.15, 0]} rotation={[0, 0, isActive ? -0.6 : -0.3]}>
-          <cylinderGeometry args={[0.05, 0.05, 0.5, 6]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.2} roughness={0.6} />
-        </mesh>
-        {/* Left leg */}
-        <mesh position={[-0.1, 0.6, 0]} rotation={[isActive ? 0.3 : 0, 0, 0]}>
-          <cylinderGeometry args={[0.06, 0.06, 0.55, 6]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.15} roughness={0.6} />
-        </mesh>
-        {/* Right leg */}
-        <mesh position={[0.1, 0.6, 0]} rotation={[isActive ? -0.3 : 0, 0, 0]}>
-          <cylinderGeometry args={[0.06, 0.06, 0.55, 6]} />
-          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.15} roughness={0.6} />
-        </mesh>
-        {/* Glow aura */}
-        <mesh ref={glowRef}>
-          <sphereGeometry args={[0.35, 8, 8]} />
-          <meshBasicMaterial color={color} transparent opacity={0.15} />
-        </mesh>
-      </group>
-      {/* Name label placeholder — point light below name */}
-      {isActive && (
-        <pointLight position={[0, 2, 0]} intensity={1.5} color={color} distance={3} />
-      )}
-    </group>
+    <mesh position={[0, 0.15, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <planeGeometry args={[24, 24]} />
+      <meshBasicMaterial color="#001122" transparent opacity={0.25} depthWrite={false} />
+    </mesh>
   );
 }
 
-const AGENTS_CONFIG = [
-  { name: 'ShadowInjector', color: '#FF0000' },
-  { name: 'ContextPhantom', color: '#9B00FF' },
-  { name: 'PrivilegeReaper', color: '#FF6600' },
-  { name: 'SilentEscalator', color: '#00FFFF' },
-  { name: 'NetworkPhantom', color: '#00FF88' },
-];
+// ── Main export ───────────────────────────────────────────────────────────────
+export default function SmartHome3D({
+  deviceStates = {},
+  activeAttack = null,
+  defendedTargets = [],
+  activeAgent = null,
+}) {
+  const agentNames = Object.keys(AGENT_HOME_POSITIONS);
 
-export default function SmartHome3D({ deviceStates = {}, activeAttack = null, defendedTargets = [], activeAgent = null }) {
   return (
-    <div className="w-full h-full" style={{ minHeight: 320 }}>
+    <div className="w-full h-full">
       <Canvas
-        camera={{ position: [10, 7, 10], fov: 45 }}
-        shadows
-        gl={{ antialias: true }}
+        camera={{ position: [11, 8, 12], fov: 42 }}
+        shadows="soft"
+        gl={{ antialias: true, alpha: true }}
         style={{ background: 'transparent' }}
+        performance={{ min: 0.5 }}
       >
-        <ambientLight intensity={0.6} color="#E0D0B0" />
-        <directionalLight position={[8, 12, 8]} intensity={1.2} color="#FFFAE8" castShadow />
-        <pointLight position={[0, 5, 0]} intensity={0.8} color="#FFE8A0" distance={12} />
-        <pointLight position={[-6, 3, 0]} intensity={0.4} color="#4488FF" distance={10} />
+        {/* Lighting */}
+        <ambientLight intensity={0.5} color="#D0C8B8" />
+        <directionalLight
+          position={[10, 14, 8]} intensity={1.1} color="#FFF8E8"
+          castShadow shadow-mapSize={[1024, 1024]}
+          shadow-camera-near={0.1} shadow-camera-far={40}
+          shadow-camera-left={-12} shadow-camera-right={12}
+          shadow-camera-top={12} shadow-camera-bottom={-12}
+        />
+        <pointLight position={[-6, 4, 0]} intensity={0.5} color="#4488FF" distance={14} />
+        <pointLight position={[0, 6, 0]} intensity={0.4} color="#FFE8A0" distance={10} />
 
-        <Floor />
-        <GridLines />
+        <fog attach="fog" color="#0A0A0F" near={18} far={30} />
+
+        {/* Scene */}
+        <Ground />
+        <FogLayer />
         <House />
-        <FenceRow />
+        <PerimeterFence />
         <AmbientParticles />
 
-        {/* AI Agent bodies */}
-        {AGENTS_CONFIG.map((agent) => (
-          <AgentBody
-            key={agent.name}
-            name={agent.name}
-            color={agent.color}
-            isActive={activeAgent === agent.name}
+        {/* AI Agents */}
+        {agentNames.map(name => (
+          <AgentFigure
+            key={name}
+            name={name}
+            isActive={activeAgent === name}
+            activeAttack={activeAgent === name ? activeAttack : null}
           />
         ))}
 
-        {DEVICE_CONFIG.map((device) => {
-          const isActive = activeAttack?.target === device.id;
-          const isDefended = defendedTargets.includes(device.id);
-          const attackSucceeded = isActive && activeAttack?.success === true;
-
+        {/* Device nodes */}
+        {Object.keys(DEVICE_POSITIONS).map(deviceId => {
+          const isTargeted = activeAttack?.target === deviceId;
+          const attackSuccess = isTargeted && activeAttack?.success === true;
+          const defended = defendedTargets.includes(deviceId) || (isTargeted && activeAttack?.success === false);
           return (
             <DeviceNode
-              key={device.id}
-              position={device.position}
-              color={device.color}
-              emissive={device.emissive}
-              label={device.label}
-              shape={device.shape}
-              compromised={attackSucceeded}
-              defended={(isActive && !attackSucceeded) || isDefended}
+              key={deviceId}
+              deviceId={deviceId}
+              compromised={attackSuccess}
+              defended={defended}
             />
           );
         })}
 
-        <AttackBeam
-          active={activeAttack !== null}
-          success={activeAttack?.success === true}
-        />
+        {/* Attack beam */}
+        <AttackBeam activeAttack={activeAttack} activeAgent={activeAgent} />
 
         <OrbitControls
-          enablePan
-          enableZoom
-          maxPolarAngle={Math.PI / 2.1}
-          minPolarAngle={Math.PI / 8}
-          maxDistance={20}
+          enablePan enableZoom
+          maxPolarAngle={Math.PI / 2.05}
+          minPolarAngle={Math.PI / 10}
+          maxDistance={22}
           minDistance={4}
+          enableDamping dampingFactor={0.08}
         />
       </Canvas>
     </div>
