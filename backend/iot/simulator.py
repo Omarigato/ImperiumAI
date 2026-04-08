@@ -8,6 +8,7 @@ _SAFE_STATE = {
     "thermostat": {"status": "normal", "temperature": 20},
     "security_panel": {"status": "armed", "armed": True},
     "alarm": {"status": "inactive", "triggered": False},
+    "router": {"status": "secure", "firewall": True, "dns_hijacked": False},
 }
 
 # Maps (target, action) -> new state description
@@ -25,6 +26,10 @@ _ACTION_MAP: dict[tuple[str, str], dict] = {
     ("security_panel", "arm"): {"status": "armed", "armed": True},
     ("alarm", "trigger"): {"status": "triggered", "triggered": True},
     ("alarm", "silence"): {"status": "inactive", "triggered": False},
+    ("router", "disable_firewall"): {"status": "compromised", "firewall": False, "dns_hijacked": False},
+    ("router", "dns_spoof"): {"status": "dns_poisoned", "firewall": True, "dns_hijacked": True},
+    ("router", "disable"): {"status": "compromised", "firewall": False, "dns_hijacked": True},
+    ("router", "restore"): {"status": "secure", "firewall": True, "dns_hijacked": False},
 }
 
 

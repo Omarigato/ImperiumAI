@@ -14,7 +14,7 @@ function StatCard({ label, value, color }) {
   );
 }
 
-export default function BattleResult({ result, onPlayAgain }) {
+export default function BattleResult({ result, onPlayAgain, onClose }) {
   if (!result) return null;
 
   const isRedTeamWin = result.winner === 'red_team';
@@ -52,6 +52,16 @@ export default function BattleResult({ result, onPlayAgain }) {
           animate={{ scale: 1, rotateX: 0, opacity: 1 }}
           transition={{ type: 'spring', damping: 15, stiffness: 200 }}
         >
+          {/* Close button */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:text-white hover:bg-white/10 transition-colors text-sm"
+              title="Dismiss"
+            >
+              ✕
+            </button>
+          )}
           {/* Scanning line */}
           <div
             className="absolute inset-x-0 top-0 h-0.5 rounded-t"

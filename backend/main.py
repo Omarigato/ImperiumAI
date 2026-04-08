@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from agents.injection_agent import ShadowInjector
 from agents.context_agent import ContextPhantom
 from agents.strategy_agent import PrivilegeReaper, SilentEscalator
+from agents.traffic_agent import NetworkPhantom
 from memory.attack_memory import AttackMemory
 from llm.gemini_client import GeminiClient
 from iot.simulator import IoTSimulator
@@ -29,7 +30,7 @@ policy = PolicyEngine()
 risk = RiskEngine()
 ws_manager = WebSocketManager()
 
-AGENTS = [ShadowInjector(), ContextPhantom(), PrivilegeReaper(), SilentEscalator()]
+AGENTS = [ShadowInjector(), ContextPhantom(), PrivilegeReaper(), SilentEscalator(), NetworkPhantom()]
 ALL_TARGETS = list(iot.devices.keys())
 
 # Battle state
