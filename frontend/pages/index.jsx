@@ -104,6 +104,7 @@ const FEATURE_ITEMS = [
   { icon: '👻', label: 'ContextPhantom', desc: 'Context manipulation expert', color: '#9B00FF' },
   { icon: '💀', label: 'PrivilegeReaper', desc: 'Privilege escalation master', color: '#FF6600' },
   { icon: '🕷', label: 'SilentEscalator', desc: 'Stealthy boundary eroder', color: '#00FFFF' },
+  { icon: '🌐', label: 'NetworkPhantom', desc: 'Network traffic interceptor', color: '#00FF88' },
 ];
 
 export default function IndexPage() {
@@ -151,7 +152,7 @@ export default function IndexPage() {
 
         {/* Agent cards */}
         <motion.div
-          className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full"
+          className="grid grid-cols-2 sm:grid-cols-5 gap-3 w-full"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
@@ -209,6 +210,28 @@ export default function IndexPage() {
               whileTap={{ scale: 0.97 }}
             >
               📊 ANALYTICS
+            </motion.div>
+          </Link>
+
+          <Link href="/agents">
+            <motion.div
+              className="btn-cyber px-10 py-4 rounded text-center font-bold tracking-widest text-sm cursor-pointer"
+              style={{ color: '#FF6600', border: '1px solid #FF660044' }}
+              whileHover={{ scale: 1.04, boxShadow: '0 0 20px #FF660044' }}
+              whileTap={{ scale: 0.97 }}
+            >
+              🤖 AGENTS
+            </motion.div>
+          </Link>
+
+          <Link href="/team">
+            <motion.div
+              className="btn-cyber px-10 py-4 rounded text-center font-bold tracking-widest text-sm cursor-pointer"
+              style={{ color: '#9B00FF', border: '1px solid #9B00FF44' }}
+              whileHover={{ scale: 1.04, boxShadow: '0 0 20px #9B00FF44' }}
+              whileTap={{ scale: 0.97 }}
+            >
+              👥 TEAM
             </motion.div>
           </Link>
         </motion.div>

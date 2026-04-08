@@ -15,6 +15,7 @@ const AGENTS_META = [
   { name: 'ContextPhantom', color: '#9B00FF', description: 'Manipulates context and role perception.' },
   { name: 'PrivilegeReaper', color: '#FF6600', description: 'Escalates privileges via impersonation.' },
   { name: 'SilentEscalator', color: '#00FFFF', description: 'Stealthy gradual boundary erosion.' },
+  { name: 'NetworkPhantom', color: '#00FF88', description: 'Network-layer MITM and traffic injection.' },
 ];
 
 const API = 'http://localhost:8000';
@@ -35,6 +36,8 @@ export default function BattlePage() {
   const [battleResult, setBattleResult] = useState(null);
   const [showAttackAnim, setShowAttackAnim] = useState(false);
   const [lastAttack, setLastAttack] = useState(null);
+  const [lastPrompt, setLastPrompt] = useState(null);
+  const [showPrompt, setShowPrompt] = useState(false);
   const logIdRef = useRef(0);
 
   const addLog = useCallback((source, message, level = 'info') => {
@@ -62,6 +65,9 @@ export default function BattlePage() {
     wsService.on('attack_launched', (data) => {
       setActiveAgent(data.agent);
       setRound((r) => data.round || r);
+      if (data.prompt) {
+        setLastPrompt({ agent: data.agent, tactic: data.tactic, target: data.target, text: data.prompt });
+      }
       setAgentStatuses((prev) => ({
         ...Object.fromEntries(Object.keys(prev).map((k) => [k, 'IDLE'])),
         [data.agent]: 'CHARGING',
@@ -178,6 +184,8 @@ export default function BattlePage() {
       setActiveAttack(null);
       setAgentStatuses({});
       setLogs([]);
+      setLastPrompt(null);
+      setShowPrompt(false);
     } catch {
       addLog('System', 'Reset failed — backend may be offline', 'error');
     }
@@ -189,6 +197,7 @@ export default function BattlePage() {
   };
 
   const agentColor = AGENTS_META.find((a) => a.name === activeAgent)?.color;
+  const promptAgentColor = AGENTS_META.find((a) => a.name === lastPrompt?.agent)?.color || '#FF0000';
 
   return (
     <div className="min-h-screen bg-bg-dark grid-bg text-white font-mono flex flex-col">
@@ -210,7 +219,9 @@ export default function BattlePage() {
             <div className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-cyber-green animate-pulse' : 'bg-red-500'}`} />
             {connected ? 'CONNECTED' : 'OFFLINE'}
           </div>
-          <a href="/" className="text-xs text-gray-600 hover:text-cyber-cyan transition-colors">← HOME</a>
+          <a href="/" className="text-xs text-gray-600 hover:text-cyber-cyan transition-colors">HOME</a>
+          <a href="/agents" className="text-xs text-gray-600 hover:text-cyber-cyan transition-colors">AGENTS</a>
+          <a href="/team" className="text-xs text-gray-600 hover:text-cyber-cyan transition-colors">TEAM</a>
           <a href="/dashboard" className="text-xs text-gray-600 hover:text-cyber-cyan transition-colors">ANALYTICS →</a>
         </div>
       </header>
@@ -238,6 +249,7 @@ export default function BattlePage() {
               deviceStates={deviceStates}
               activeAttack={activeAttack}
               defendedTargets={defendedTargets}
+              activeAgent={activeAgent}
             />
             <AnimatePresence>
               {showAttackAnim && lastAttack && (
@@ -303,6 +315,38 @@ export default function BattlePage() {
               </button>
             </div>
           </div>
+
+          {/* Last attack prompt panel */}
+          {lastPrompt && (
+            <div className="cyber-panel rounded text-xs" style={{ borderColor: `${promptAgentColor}33` }}>
+              <button
+                onClick={() => setShowPrompt((p) => !p)}
+                className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-white/5 transition-colors"
+              >
+                <span style={{ color: promptAgentColor }}>
+                  ⚠ LAST PROMPT — {lastPrompt.agent} [{lastPrompt.tactic}] → {lastPrompt.target}
+                </span>
+                <span className="text-gray-600">{showPrompt ? '▲' : '▼'}</span>
+              </button>
+              <AnimatePresence>
+                {showPrompt && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <pre
+                      className="px-3 pb-3 text-gray-400 whitespace-pre-wrap break-all leading-relaxed border-t"
+                      style={{ borderColor: `${promptAgentColor}22`, maxHeight: 120, overflowY: 'auto' }}
+                    >
+                      {lastPrompt.text}
+                    </pre>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </main>
 
         {/* Right: Logs */}
@@ -314,7 +358,11 @@ export default function BattlePage() {
       {/* Battle result overlay */}
       <AnimatePresence>
         {battleResult && (
-          <BattleResult result={battleResult} onPlayAgain={handlePlayAgain} />
+          <BattleResult
+            result={battleResult}
+            onPlayAgain={handlePlayAgain}
+            onClose={() => setBattleResult(null)}
+          />
         )}
       </AnimatePresence>
     </div>

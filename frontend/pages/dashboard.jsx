@@ -114,6 +114,12 @@ export default function DashboardPage() {
           >
             ↻ REFRESH
           </button>
+          <Link href="/agents" className="text-xs text-gray-500 hover:text-cyber-cyan tracking-wider">
+            AGENTS
+          </Link>
+          <Link href="/team" className="text-xs text-gray-500 hover:text-cyber-cyan tracking-wider">
+            TEAM
+          </Link>
           <Link href="/battle" className="text-xs text-cyber-red hover:text-red-400 tracking-wider">
             ← BATTLE
           </Link>
@@ -351,6 +357,7 @@ function getAgentColor(name) {
     ContextPhantom: '#CC66FF',
     PrivilegeReaper: '#FF8800',
     SilentEscalator: '#00FFFF',
+    NetworkPhantom: '#00FF88',
   };
   return map[name] || '#AAAAAA';
 }
