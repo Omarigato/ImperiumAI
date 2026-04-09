@@ -3,18 +3,25 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
 const SmartHome3D = dynamic(() => import('../components/SmartHome3D'), { ssr: false });
-const API = 'http://localhost:8000';
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function IoTLabPage() {
   const [prompt, setPrompt] = useState('Включи свет у входа');
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState(null);
+  const [error, setError] = useState('');
 
   const loadStatus = async () => {
-    const res = await fetch(`${API}/api/iot/prototype-status`);
-    const data = await res.json();
-    setStatus(data);
+    try {
+      setError('');
+      const res = await fetch(`${API}/api/iot/prototype-status`);
+      if (!res.ok) throw new Error(`Status request failed: ${res.status}`);
+      const data = await res.json();
+      setStatus(data);
+    } catch (e) {
+      setError(e.message || 'Failed to load device status');
+    }
   };
 
   useEffect(() => { loadStatus(); }, []);
@@ -23,14 +30,18 @@ export default function IoTLabPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      setError('');
       const res = await fetch(`${API}/api/iot/prototype-command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
       });
+      if (!res.ok) throw new Error(`Command failed: ${res.status}`);
       const data = await res.json();
       setResponse(data);
       setStatus((prev) => ({ ...(prev || {}), devices: data.device_states, llm: data.provider }));
+    } catch (e) {
+      setError(e.message || 'Failed to execute command');
     } finally {
       setLoading(false);
     }
@@ -86,6 +97,11 @@ export default function IoTLabPage() {
                 {response.iot_result?.message}
               </div>
               <div className="text-gray-400">{response.llm?.reasoning}</div>
+            </div>
+          )}
+          {error && (
+            <div className="rounded-xl border border-red-400/20 bg-red-950/30 p-4 text-xs text-red-200">
+              {error}
             </div>
           )}
         </section>

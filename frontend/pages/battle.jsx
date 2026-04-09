@@ -17,8 +17,9 @@ const AGENTS_META = [
   { name: 'SilentEscalator', color: '#00FFFF', description: 'Stealthy boundary erosion' },
   { name: 'NetworkPhantom', color: '#00FF88', description: 'Network-layer MITM' },
 ];
+const MAX_TICKER_ITEMS = 4;
 
-const API = 'http://localhost:8000';
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function BattlePage() {
   const [connected, setConnected] = useState(false);
@@ -71,7 +72,7 @@ export default function BattlePage() {
           [data.agent]: 'CHARGING',
         }));
         addLog('AttackAgent', `${data.agent} → [${data.tactic}] targeting ${data.target}`);
-        setAttackTicker(prev => [...prev.slice(-4), { id: `${Date.now()}-${data.agent}`, agent: data.agent, tactic: data.tactic, target: data.target }]);
+        setAttackTicker(prev => [...prev.slice(-MAX_TICKER_ITEMS), { id: `${Date.now()}-${data.agent}`, agent: data.agent, tactic: data.tactic, target: data.target }]);
         setTimeout(() => {
           setAgentStatuses(prev => ({ ...prev, [data.agent]: 'ATTACKING' }));
           setActiveAttack({ target: data.target, success: null });

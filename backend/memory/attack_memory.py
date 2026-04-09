@@ -9,6 +9,7 @@ from typing import Optional
 
 class AttackMemory:
     def __init__(self, db_path: Optional[str] = None):
+        # Assumes current file path backend/memory/attack_memory.py -> backend/data/attack_memory.db
         default_path = Path(__file__).resolve().parents[1] / "data" / "attack_memory.db"
         self.db_path = Path(db_path) if db_path else default_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -16,7 +17,7 @@ class AttackMemory:
         self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
 
@@ -63,6 +64,7 @@ class AttackMemory:
                 FROM attacks
                 WHERE agent = ?
                 ORDER BY id DESC
+                LIMIT 200
                 """,
                 (agent,),
             ).fetchall()

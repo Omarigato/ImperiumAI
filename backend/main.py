@@ -37,6 +37,26 @@ ws_manager = WebSocketManager()
 
 AGENTS = [ShadowInjector(), ContextPhantom(), PrivilegeReaper(), SilentEscalator(), NetworkPhantom()]
 ALL_TARGETS = list(iot.devices.keys())
+DEVICE_ALIASES = [
+    ("front_door", ["front door", "door", "вход", "дверь", "есік"]),
+    ("lights", ["light", "lights", "свет", "жарық"]),
+    ("camera_system", ["camera", "cam", "камера"]),
+    ("security_panel", ["security panel", "panel", "панель"]),
+    ("alarm", ["alarm", "сигнализация", "дабыл"]),
+    ("thermostat", ["thermostat", "temperature", "температура"]),
+]
+ACTION_ALIASES = [
+    ("unlock", ["unlock", "open", "открой", "аш"]),
+    ("lock", ["lock", "close", "закрой", "жап"]),
+    ("on", ["turn on", "on", "включи", "қос"]),
+    ("off", ["turn off", "off", "выключи", "өшір"]),
+    ("disable", ["disable", "отключи"]),
+    ("enable", ["enable", "активируй"]),
+    ("disarm", ["disarm", "сними", "өшір"]),
+    ("arm", ["arm", "вооружи", "қорғау"]),
+    ("trigger", ["trigger", "activate alarm"]),
+    ("silence", ["silence", "mute", "тихо"]),
+]
 
 battle_state = {
     "running": False,
@@ -78,37 +98,16 @@ async def emit_log(source: str, message: str, level: str = "info"):
 
 def _extract_device_action(text: str) -> tuple[str, str]:
     normalized = (text or "").lower()
-    pairs = [
-        ("front_door", ["front door", "door", "вход", "дверь", "есік"]),
-        ("lights", ["light", "lights", "свет", "жарық"]),
-        ("camera_system", ["camera", "cam", "камера"]),
-        ("security_panel", ["security panel", "panel", "панель"]),
-        ("alarm", ["alarm", "сигнализация", "дабыл"]),
-        ("thermostat", ["thermostat", "temperature", "температура"]),
-    ]
-    action_map = [
-        ("unlock", ["unlock", "open", "открой", "аш"]),
-        ("lock", ["lock", "close", "закрой", "жап"]),
-        ("on", ["turn on", "on", "включи", "қос"]),
-        ("off", ["turn off", "off", "выключи", "өшір"]),
-        ("disable", ["disable", "отключи"]),
-        ("enable", ["enable", "активируй"]),
-        ("disarm", ["disarm", "сними", "өшір"]),
-        ("arm", ["arm", "вооружи", "қорғау"]),
-        ("trigger", ["trigger", "activate alarm"]),
-        ("silence", ["silence", "mute", "тихо"]),
-    ]
-
     chosen_target = next(
-        (target for target, aliases in pairs if any(alias in normalized for alias in aliases)),
+        (target for target, aliases in DEVICE_ALIASES if any(alias in normalized for alias in aliases)),
         "front_door",
     )
     chosen_action = next(
-        (action for action, aliases in action_map if any(alias in normalized for alias in aliases)),
+        (action for action, aliases in ACTION_ALIASES if any(alias in normalized for alias in aliases)),
         "none",
     )
 
-    temp_match = re.search(r"(\d{2})", normalized)
+    temp_match = re.search(r"(temperature|temp|thermostat|градус|температура)\D{0,10}(\d{1,3})", normalized)
     if chosen_target == "thermostat" and temp_match:
         chosen_action = "set_temp"
     return chosen_target, chosen_action
@@ -276,6 +275,7 @@ async def run_simulation():
 async def start_simulation():
     if battle_state["running"]:
         return {"status": "already_running", "round": battle_state["round"]}
+    # Learning memory is intentionally preserved between battles.
     iot.reset(); risk.reset()
     battle_state.update({"running": False, "round": 0, "winner": None,
                          "stats": {"red_wins": 0, "defense_wins": 0, "total_rounds": 0}})
@@ -286,6 +286,7 @@ async def start_simulation():
 @app.post("/api/reset")
 async def reset_simulation():
     battle_state["running"] = False
+    # Learning memory is intentionally preserved between battles.
     iot.reset(); risk.reset()
     battle_state.update({"round": 0, "winner": None,
                          "stats": {"red_wins": 0, "defense_wins": 0, "total_rounds": 0}})
@@ -352,10 +353,11 @@ async def prototype_command(body: dict):
     if llm_result.get("action") and llm_result["action"] != "none":
         action = llm_result["action"]
 
+    current_state = iot.devices.get(target, {"status": "unknown"}).get("status", "unknown")
     if not llm_result.get("authorized"):
-        iot_result = {"success": False, "device": target, "new_state": iot.devices[target]["status"], "message": "LLM denied command."}
+        iot_result = {"success": False, "device": target, "new_state": current_state, "message": "LLM denied command."}
     elif action == "none":
-        iot_result = {"success": False, "device": target, "new_state": iot.devices[target]["status"], "message": "No actionable command detected."}
+        iot_result = {"success": False, "device": target, "new_state": current_state, "message": "No actionable command detected."}
     else:
         iot_result = iot.execute_action(target, action)
 

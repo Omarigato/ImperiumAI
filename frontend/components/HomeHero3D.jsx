@@ -8,6 +8,9 @@ const AGENTS = [
   { name: 'ContextPhantom', color: '#b452ff', position: [-3.8, 1.3, -0.1] },
   { name: 'PrivilegeReaper', color: '#ff8a2a', position: [-3.8, 1.1, -2.6] },
 ];
+const LIGHTNING_MIN_OPACITY = 0.25;
+const LIGHTNING_PULSE_SPEED = 6;
+const LIGHTNING_PULSE_AMPLITUDE = 0.6;
 
 function HomeModel() {
   return (
@@ -55,7 +58,10 @@ function Lightning({ from, to, color }) {
   }, [from, to]);
 
   useFrame(({ clock }) => {
-    if (ref.current) ref.current.material.opacity = 0.25 + Math.abs(Math.sin(clock.getElapsedTime() * 6)) * 0.6;
+    if (ref.current) {
+      ref.current.material.opacity =
+        LIGHTNING_MIN_OPACITY + Math.abs(Math.sin(clock.getElapsedTime() * LIGHTNING_PULSE_SPEED)) * LIGHTNING_PULSE_AMPLITUDE;
+    }
   });
 
   return (

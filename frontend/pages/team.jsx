@@ -28,7 +28,7 @@ Specializes in AI systems, cybersecurity research, and interactive 3D visualizat
     name: 'Тажибаев Арнур',
     nameEn: 'Tazhibayev Arnur',
     role: 'AI Red Team Analyst',
-    studentId: 'N/A',
+    studentId: 'IITU Student',
     university: 'IITU — International Information Technology University',
     bio: `Жоба бойынша шабуыл сценарийлері мен агенттік стратегияларды зерттейді. Негізгі бағыты — prompt injection және context poisoning шабуылдарының нақты әсерін көрсету.
 
@@ -48,7 +48,7 @@ Focus: сценарий сапасын көтеру, Learning Journey конте
     name: 'Кайсенов Жанторе',
     nameEn: 'Kaisenov Zhantore',
     role: '3D & IoT Prototype Developer',
-    studentId: 'N/A',
+    studentId: 'IITU Student',
     university: 'IITU — International Information Technology University',
     bio: `3D сахналар, IoT объект модельдері және интерактивті прототип беттерін әзірлеуге жауапты. Smart Home визуалын реалистік деңгейге жақындату бойынша жұмыс істейді.
 
