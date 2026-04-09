@@ -120,6 +120,9 @@ export default function DashboardPage() {
           <Link href="/team" className="text-xs text-gray-500 hover:text-cyber-cyan tracking-wider">
             TEAM
           </Link>
+          <Link href="/iot-lab" className="text-xs text-gray-500 hover:text-cyber-cyan tracking-wider">
+            IOT LAB
+          </Link>
           <Link href="/battle" className="text-xs text-cyber-red hover:text-red-400 tracking-wider">
             ← BATTLE
           </Link>

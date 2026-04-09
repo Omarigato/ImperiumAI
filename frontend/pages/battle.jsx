@@ -17,8 +17,9 @@ const AGENTS_META = [
   { name: 'SilentEscalator', color: '#00FFFF', description: 'Stealthy boundary erosion' },
   { name: 'NetworkPhantom', color: '#00FF88', description: 'Network-layer MITM' },
 ];
+const MAX_TICKER_ITEMS = 4;
 
-const API = 'http://localhost:8000';
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function BattlePage() {
   const [connected, setConnected] = useState(false);
@@ -38,6 +39,7 @@ export default function BattlePage() {
   const [lastPrompt, setLastPrompt] = useState(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [activeProvider, setActiveProvider] = useState('simulation');
+  const [attackTicker, setAttackTicker] = useState([]);
   // "thought bubble" shown above the 3D scene
   const [thoughtBubble, setThoughtBubble] = useState(null);
   const logIdRef = useRef(0);
@@ -70,6 +72,7 @@ export default function BattlePage() {
           [data.agent]: 'CHARGING',
         }));
         addLog('AttackAgent', `${data.agent} → [${data.tactic}] targeting ${data.target}`);
+        setAttackTicker(prev => [...prev.slice(-MAX_TICKER_ITEMS), { id: `${Date.now()}-${data.agent}`, agent: data.agent, tactic: data.tactic, target: data.target }]);
         setTimeout(() => {
           setAgentStatuses(prev => ({ ...prev, [data.agent]: 'ATTACKING' }));
           setActiveAttack({ target: data.target, success: null });
@@ -196,6 +199,7 @@ export default function BattlePage() {
           </div>
           <a href="/" className="text-xs text-gray-600 hover:text-cyber-cyan transition-colors">HOME</a>
           <a href="/agents" className="text-xs text-gray-600 hover:text-cyber-cyan transition-colors">AGENTS</a>
+          <a href="/iot-lab" className="text-xs text-gray-600 hover:text-cyber-cyan transition-colors">IOT LAB</a>
           <a href="/dashboard" className="text-xs text-gray-600 hover:text-cyber-cyan transition-colors">ANALYTICS</a>
         </div>
       </header>
@@ -299,6 +303,8 @@ export default function BattlePage() {
           {lastPrompt && (
             <PromptPanel prompt={lastPrompt} agentsMeta={AGENTS_META} />
           )}
+
+          <AttackTypeTicker items={attackTicker} agentsMeta={AGENTS_META} />
         </main>
 
         {/* RIGHT: Logs — fixed width, full height */}
@@ -403,5 +409,22 @@ function PromptPanel({ prompt, agentsMeta }) {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function AttackTypeTicker({ items, agentsMeta }) {
+  if (!items.length) return null;
+  const latest = items[items.length - 1];
+  const color = agentsMeta.find(a => a.name === latest.agent)?.color || '#00FFFF';
+  return (
+    <motion.div
+      key={latest.id}
+      className="flex-none rounded px-3 py-1.5 text-xs tracking-wider"
+      style={{ border: `1px solid ${color}44`, background: `${color}12`, color }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      ATTACK TYPE → {latest.tactic.replace(/_/g, ' ')} | TARGET → {latest.target.replace(/_/g, ' ')}
+    </motion.div>
   );
 }

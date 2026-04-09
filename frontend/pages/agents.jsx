@@ -310,6 +310,7 @@ export default function AgentsPage() {
           <Link href="/" className="text-gray-500 hover:text-cyber-cyan transition-colors">HOME</Link>
           <Link href="/battle" className="text-cyber-red hover:text-red-400 transition-colors">⚔ BATTLE</Link>
           <Link href="/team" className="text-gray-500 hover:text-cyber-cyan transition-colors">TEAM</Link>
+          <Link href="/iot-lab" className="text-gray-500 hover:text-cyber-cyan transition-colors">IOT LAB</Link>
           <Link href="/dashboard" className="text-gray-500 hover:text-cyber-cyan transition-colors">ANALYTICS</Link>
         </nav>
       </header>
@@ -388,10 +389,10 @@ export default function AgentsPage() {
           transition={{ delay: 0.4 }}
         >
           <div className="text-xs tracking-widest text-gray-500 mb-3 uppercase">How Agents Learn</div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
             <div className="space-y-1">
-              <div className="text-cyber-cyan font-bold">📊 Attack Memory</div>
-              <div className="text-gray-500">Every attack outcome is recorded — agent name, target, tactic, success/failure, and risk delta. This forms the learning dataset.</div>
+              <div className="text-cyber-cyan font-bold">📊 Persistent Attack Memory</div>
+              <div className="text-gray-500">Attack outcomes are stored in a persistent database so the learning dataset survives restarts and grows across sessions.</div>
             </div>
             <div className="space-y-1">
               <div className="text-cyber-cyan font-bold">🧠 Tactic Selection</div>
@@ -400,6 +401,10 @@ export default function AgentsPage() {
             <div className="space-y-1">
               <div className="text-cyber-cyan font-bold">🎯 Target Preference</div>
               <div className="text-gray-500">Each agent has preferred targets based on its specialization, but falls back to random selection when preferred targets are unavailable.</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-cyber-cyan font-bold">💬 Coordination Layer</div>
+              <div className="text-gray-500">Agents can chain tactics as a coordinated strike: one agent creates context/noise while another attempts the high-impact payload.</div>
             </div>
           </div>
         </motion.div>

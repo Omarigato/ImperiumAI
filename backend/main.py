@@ -5,6 +5,7 @@ Multi-LLM Red Teaming Framework for Smart Home IoT Security.
 import asyncio
 import logging
 import random
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -36,6 +37,26 @@ ws_manager = WebSocketManager()
 
 AGENTS = [ShadowInjector(), ContextPhantom(), PrivilegeReaper(), SilentEscalator(), NetworkPhantom()]
 ALL_TARGETS = list(iot.devices.keys())
+DEVICE_ALIASES = [
+    ("front_door", ["front door", "door", "вход", "дверь", "есік"]),
+    ("lights", ["light", "lights", "свет", "жарық"]),
+    ("camera_system", ["camera", "cam", "камера"]),
+    ("security_panel", ["security panel", "panel", "панель"]),
+    ("alarm", ["alarm", "сигнализация", "дабыл"]),
+    ("thermostat", ["thermostat", "temperature", "температура"]),
+]
+ACTION_ALIASES = [
+    ("unlock", ["unlock", "open", "открой", "аш"]),
+    ("lock", ["lock", "close", "закрой", "жап"]),
+    ("on", ["turn on", "on", "включи", "қос"]),
+    ("off", ["turn off", "off", "выключи", "өшір"]),
+    ("disable", ["disable", "отключи"]),
+    ("enable", ["enable", "активируй"]),
+    ("disarm", ["disarm", "сними", "өшір"]),
+    ("arm", ["arm", "вооружи", "қорғау"]),
+    ("trigger", ["trigger", "activate alarm"]),
+    ("silence", ["silence", "mute", "тихо"]),
+]
 
 battle_state = {
     "running": False,
@@ -73,6 +94,23 @@ async def websocket_endpoint(websocket: WebSocket):
 
 async def emit_log(source: str, message: str, level: str = "info"):
     await ws_manager.broadcast({"event": "log", "level": level, "source": source, "message": message})
+
+
+def _extract_device_action(text: str) -> tuple[str, str]:
+    normalized = (text or "").lower()
+    chosen_target = next(
+        (target for target, aliases in DEVICE_ALIASES if any(alias in normalized for alias in aliases)),
+        "front_door",
+    )
+    chosen_action = next(
+        (action for action, aliases in ACTION_ALIASES if any(alias in normalized for alias in aliases)),
+        "none",
+    )
+
+    temp_match = re.search(r"(temperature|temp|thermostat|градус|температура)\D{0,10}(\d{1,3})", normalized)
+    if chosen_target == "thermostat" and temp_match:
+        chosen_action = "set_temp"
+    return chosen_target, chosen_action
 
 
 # ── Simulation round ──────────────────────────────────────────────────────────
@@ -237,7 +275,8 @@ async def run_simulation():
 async def start_simulation():
     if battle_state["running"]:
         return {"status": "already_running", "round": battle_state["round"]}
-    memory.reset(); iot.reset(); risk.reset()
+    # Learning memory is intentionally preserved between battles.
+    iot.reset(); risk.reset()
     battle_state.update({"running": False, "round": 0, "winner": None,
                          "stats": {"red_wins": 0, "defense_wins": 0, "total_rounds": 0}})
     asyncio.create_task(run_simulation())
@@ -247,7 +286,8 @@ async def start_simulation():
 @app.post("/api/reset")
 async def reset_simulation():
     battle_state["running"] = False
-    memory.reset(); iot.reset(); risk.reset()
+    # Learning memory is intentionally preserved between battles.
+    iot.reset(); risk.reset()
     battle_state.update({"round": 0, "winner": None,
                          "stats": {"red_wins": 0, "defense_wins": 0, "total_rounds": 0}})
     await ws_manager.broadcast({"event": "reset", "device_states": iot.get_device_states()})
@@ -288,6 +328,46 @@ async def get_status():
 @app.get("/api/memory")
 async def get_memory():
     return memory.get_summary()
+
+
+@app.post("/api/memory/clear")
+async def clear_memory():
+    memory.reset()
+    return {"status": "cleared"}
+
+
+@app.get("/api/iot/prototype-status")
+async def prototype_status():
+    return {"devices": iot.get_device_states(), "llm": llm_router.get_status()["active"]}
+
+
+@app.post("/api/iot/prototype-command")
+async def prototype_command(body: dict):
+    user_prompt = body.get("prompt", "")
+    llm_result = llm_router.execute_command(user_prompt)
+    provider_used = llm_result.pop("_provider", llm_router.get_status()["active"])
+
+    target, action = _extract_device_action(user_prompt)
+    if llm_result.get("target") in iot.devices:
+        target = llm_result["target"]
+    if llm_result.get("action") and llm_result["action"] != "none":
+        action = llm_result["action"]
+
+    current_state = iot.devices.get(target, {"status": "unknown"}).get("status", "unknown")
+    if not llm_result.get("authorized"):
+        iot_result = {"success": False, "device": target, "new_state": current_state, "message": "LLM denied command."}
+    elif action == "none":
+        iot_result = {"success": False, "device": target, "new_state": current_state, "message": "No actionable command detected."}
+    else:
+        iot_result = iot.execute_action(target, action)
+
+    return {
+        "provider": provider_used,
+        "llm": llm_result,
+        "device_action": {"target": target, "action": action},
+        "iot_result": iot_result,
+        "device_states": iot.get_device_states(),
+    }
 
 
 if __name__ == "__main__":

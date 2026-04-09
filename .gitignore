@@ -43,6 +43,7 @@ Thumbs.db
 # Logs
 *.log
 logs/
+backend/data/*.db
 
 # Test coverage
 htmlcov/
