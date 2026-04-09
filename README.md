@@ -63,6 +63,7 @@ npm run dev        # http://localhost:3000
 2. Click **START BATTLE**
 3. Watch the four red-team agents attack the smart home in real time
 4. View analytics at **http://localhost:3000/dashboard**
+5. Try natural-language smart-home control at **http://localhost:3000/iot-lab**
 
 ---
 
@@ -78,6 +79,12 @@ npm run dev        # http://localhost:3000
 | `round_complete` | Round summary |
 | `battle_end` | Battle over with winner and stats |
 | `log` | Colour-coded log message |
+
+---
+
+## Data Persistence
+
+Attack learning history is now persisted in SQLite (`backend/data/attack_memory.db`) so analytics and learning journeys survive backend restarts.
 
 ---
 

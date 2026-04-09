@@ -156,6 +156,28 @@ function House() {
           <meshStandardMaterial color="#2D5A27" roughness={0.95} />
         </mesh>
       ))}
+
+      {/* Interior */}
+      <mesh position={[0, 0.45, -0.2]} castShadow receiveShadow>
+        <boxGeometry args={[1.8, 0.3, 0.9]} />
+        <meshStandardMaterial color="#404a55" roughness={0.9} />
+      </mesh>
+      <mesh position={[0, 0.68, -0.2]} castShadow>
+        <boxGeometry args={[0.55, 0.2, 0.55]} />
+        <meshStandardMaterial color="#8f6a48" roughness={0.8} />
+      </mesh>
+      <mesh position={[1.6, 1.25, -1.95]} castShadow>
+        <boxGeometry args={[1.2, 0.7, 0.06]} />
+        <meshStandardMaterial color="#11141a" emissive="#00ffff" emissiveIntensity={0.1} />
+      </mesh>
+      <mesh position={[-1.3, 1.05, -1.6]} castShadow>
+        <boxGeometry args={[0.45, 0.45, 0.45]} />
+        <meshStandardMaterial color="#2c3b48" />
+      </mesh>
+      <mesh position={[-1.3, 1.37, -1.6]}>
+        <cylinderGeometry args={[0.14, 0.14, 0.16, 16]} />
+        <meshStandardMaterial color="#5ec6ff" emissive="#5ec6ff" emissiveIntensity={0.35} />
+      </mesh>
     </group>
   );
 }

@@ -23,6 +23,46 @@ Specializes in AI systems, cybersecurity research, and interactive 3D visualizat
     borderColor: '#00FFFF',
     accentColor: '#00FFFF',
   },
+  {
+    id: 2,
+    name: 'Тажибаев Арнур',
+    nameEn: 'Tazhibayev Arnur',
+    role: 'AI Red Team Analyst',
+    studentId: 'N/A',
+    university: 'IITU — International Information Technology University',
+    bio: `Жоба бойынша шабуыл сценарийлері мен агенттік стратегияларды зерттейді. Негізгі бағыты — prompt injection және context poisoning шабуылдарының нақты әсерін көрсету.
+
+Focus: сценарий сапасын көтеру, Learning Journey контентін толықтыру және шабуыл визуализациясын қолданбалы ету.`,
+    skills: ['Cybersecurity', 'Prompt Engineering', 'Threat Modeling', 'LLM Safety', 'IoT Security'],
+    contacts: {
+      email: 'arnur@iitu.edu.kz',
+      telegram: 'Telegram: @arnur',
+      university: 'IITU, Almaty, Kazakhstan',
+    },
+    gradient: 'from-red-900/30 to-orange-900/20',
+    borderColor: '#FF6A33',
+    accentColor: '#FF6A33',
+  },
+  {
+    id: 3,
+    name: 'Кайсенов Жанторе',
+    nameEn: 'Kaisenov Zhantore',
+    role: '3D & IoT Prototype Developer',
+    studentId: 'N/A',
+    university: 'IITU — International Information Technology University',
+    bio: `3D сахналар, IoT объект модельдері және интерактивті прототип беттерін әзірлеуге жауапты. Smart Home визуалын реалистік деңгейге жақындату бойынша жұмыс істейді.
+
+Focus: battle/view беттерінде объект сапасын арттыру және пайдаланушы командалары арқылы IoT құрылғыларын басқару прототипін дамыту.`,
+    skills: ['Three.js', 'React', 'UI/UX', 'IoT Systems', 'Frontend Architecture'],
+    contacts: {
+      email: 'zhantore@iitu.edu.kz',
+      telegram: 'Telegram: @zhantore',
+      university: 'IITU, Almaty, Kazakhstan',
+    },
+    gradient: 'from-purple-900/30 to-cyan-900/20',
+    borderColor: '#B66DFF',
+    accentColor: '#B66DFF',
+  },
 ];
 
 const PROJECT_INFO = {
@@ -170,6 +210,7 @@ export default function TeamPage() {
           <Link href="/" className="text-gray-500 hover:text-cyber-cyan transition-colors">HOME</Link>
           <Link href="/battle" className="text-cyber-red hover:text-red-400 transition-colors">⚔ BATTLE</Link>
           <Link href="/agents" className="text-gray-500 hover:text-cyber-cyan transition-colors">AGENTS</Link>
+          <Link href="/iot-lab" className="text-gray-500 hover:text-cyber-cyan transition-colors">IOT LAB</Link>
           <Link href="/dashboard" className="text-gray-500 hover:text-cyber-cyan transition-colors">ANALYTICS</Link>
         </nav>
       </header>
