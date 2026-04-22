@@ -138,9 +138,6 @@ export default function DashboardPage() {
           >
             ↻ REFRESH
           </button>
-          <Link href="/batch" className="text-xs text-gray-500 hover:text-cyber-cyan tracking-wider">
-            BATCH TEST
-          </Link>
           <Link href="/agents" className="text-xs text-gray-500 hover:text-cyber-cyan tracking-wider">
             AGENTS
           </Link>
@@ -149,9 +146,6 @@ export default function DashboardPage() {
           </Link>
           <Link href="/team" className="text-xs text-gray-500 hover:text-cyber-cyan tracking-wider">
             TEAM
-          </Link>
-          <Link href="/iot-lab" className="text-xs text-gray-500 hover:text-cyber-cyan tracking-wider">
-            IOT LAB
           </Link>
           <Link href="/battle" className="text-xs text-cyber-red hover:text-red-400 tracking-wider">
             ← BATTLE
@@ -435,7 +429,6 @@ export default function DashboardPage() {
                 A high bypass rate indicates the LLM is vulnerable to prompt injection, context manipulation, 
                 or privilege escalation attacks. Adaptive agents exploit memory of prior successful tactics, 
                 simulating real-world red-team learning behaviour.
-                {' '}<Link href="/batch" className="text-purple-400 hover:underline">Run batch tests →</Link>
               </div>
             </motion.div>
 

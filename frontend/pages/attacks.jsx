@@ -701,7 +701,7 @@ export default function AttacksPage() {
           <Link href="/battle" className="text-red-400 hover:text-red-300 transition-colors">⚔ BATTLE</Link>
           <Link href="/agents" className="text-gray-500 hover:text-cyan-300 transition-colors">AGENTS</Link>
           <Link href="/dashboard" className="text-gray-500 hover:text-cyan-300 transition-colors">ANALYTICS</Link>
-          <Link href="/iot-lab" className="text-gray-500 hover:text-cyan-300 transition-colors">IOT LAB</Link>
+          <Link href="/team" className="text-gray-500 hover:text-cyan-300 transition-colors">TEAM</Link>
         </nav>
       </header>
 

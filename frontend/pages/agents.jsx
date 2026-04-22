@@ -315,7 +315,6 @@ export default function AgentsPage() {
           <Link href="/battle" className="text-cyber-red hover:text-red-400 transition-colors">⚔ BATTLE</Link>
           <Link href="/attacks" className="text-red-400/70 hover:text-red-400 transition-colors">ATTACKS</Link>
           <Link href="/team" className="text-gray-500 hover:text-cyber-cyan transition-colors">TEAM</Link>
-          <Link href="/iot-lab" className="text-gray-500 hover:text-cyber-cyan transition-colors">IOT LAB</Link>
           <Link href="/dashboard" className="text-gray-500 hover:text-cyber-cyan transition-colors">ANALYTICS</Link>
         </nav>
       </header>

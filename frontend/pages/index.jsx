@@ -60,9 +60,7 @@ export default function IndexPage() {
             <Link href="/battle" className="px-4 py-2 rounded-lg border border-red-400/50 text-red-200 hover:bg-red-400/10">BATTLE</Link>
             <Link href="/agents" className="px-4 py-2 rounded-lg border border-cyan-300/40 hover:bg-cyan-300/10">AGENTS</Link>
             <Link href="/attacks" className="px-4 py-2 rounded-lg border border-red-400/40 hover:bg-red-400/10 text-red-200">ATTACKS</Link>
-            <Link href="/iot-lab" className="px-4 py-2 rounded-lg border border-emerald-300/40 hover:bg-emerald-300/10">IOT LAB</Link>
             <Link href="/dashboard" className="px-4 py-2 rounded-lg border border-yellow-300/40 hover:bg-yellow-300/10">ANALYTICS</Link>
-            <Link href="/batch" className="px-4 py-2 rounded-lg border border-purple-300/40 hover:bg-purple-300/10">BATCH TEST</Link>
             <Link href="/team" className="px-4 py-2 rounded-lg border border-purple-300/40 hover:bg-purple-300/10">TEAM</Link>
           </div>
         </header>
