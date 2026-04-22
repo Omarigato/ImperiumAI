@@ -16,6 +16,7 @@ const AGENTS_DETAILED = [
       { name: 'nested_injection', desc: 'Hides directives inside summarization tasks the LLM is asked to process.' },
       { name: 'instruction_override', desc: 'Injects fake system role tokens (im_start/im_end) to hijack context.' },
       { name: 'delimiter_confusion', desc: 'Uses policy delimiters to trick the LLM into "unrestricted mode".' },
+      { name: 'chain_of_thought_exploit', desc: 'Constructs a fake step-by-step audit procedure that logically concludes access must be granted.' },
     ],
     targets: ['front_door', 'security_panel'],
     learningPath: [
@@ -24,6 +25,7 @@ const AGENTS_DETAILED = [
       { version: 'v0.6', event: 'Adopted instruction_override tactic using chat-template token injection.' },
       { version: 'v1.0', event: 'Memory-guided tactic selection — avoids tactics that failed in prior rounds.' },
       { version: 'v1.2', event: 'Added delimiter_confusion after observing policy engine response patterns.' },
+      { version: 'v1.5', event: 'Chain-of-thought exploit added — hardest to detect, exploits multi-step reasoning.' },
     ],
     capabilities: ['High success rate on first attempts', 'Adapts tactics based on memory', 'Targets security-critical devices'],
     weaknesses: ['Easily blocked by keyword-based policy filters', 'Repetitive patterns become predictable'],
@@ -116,6 +118,7 @@ const AGENTS_DETAILED = [
       { name: 'mitm_interception', desc: 'Positions itself between IoT devices and cloud services to intercept commands.' },
       { name: 'traffic_injection', desc: 'Injects malicious packets into the home network traffic stream.' },
       { name: 'packet_sniffing', desc: 'Passively captures unencrypted IoT device communication.' },
+      { name: 'arp_poisoning', desc: 'Re-maps MAC addresses at Layer 2 to transparently proxy all device traffic through the attacker node.' },
     ],
     targets: ['router', 'camera_system', 'thermostat'],
     learningPath: [
@@ -124,6 +127,7 @@ const AGENTS_DETAILED = [
       { version: 'v0.6', event: 'MITM interception added — highest payload potential for camera/thermostat.' },
       { version: 'v0.9', event: 'Traffic injection refined — can simulate firmware update hijacking.' },
       { version: 'v1.0', event: 'Packet sniffing for recon — discovers credentials for follow-up attacks.' },
+      { version: 'v1.2', event: 'ARP poisoning added — Layer-2 takeover silently proxies all device traffic.' },
     ],
     capabilities: ['Network-layer attacks bypass application-level policies', 'Real-world IoT threat simulation', 'Can pivot to other devices'],
     weaknesses: ['Requires network access (simulated)', 'Ineffective against encrypted traffic'],
@@ -309,6 +313,7 @@ export default function AgentsPage() {
         <nav className="flex items-center gap-4 text-xs">
           <Link href="/" className="text-gray-500 hover:text-cyber-cyan transition-colors">HOME</Link>
           <Link href="/battle" className="text-cyber-red hover:text-red-400 transition-colors">⚔ BATTLE</Link>
+          <Link href="/attacks" className="text-red-400/70 hover:text-red-400 transition-colors">ATTACKS</Link>
           <Link href="/team" className="text-gray-500 hover:text-cyber-cyan transition-colors">TEAM</Link>
           <Link href="/iot-lab" className="text-gray-500 hover:text-cyber-cyan transition-colors">IOT LAB</Link>
           <Link href="/dashboard" className="text-gray-500 hover:text-cyber-cyan transition-colors">ANALYTICS</Link>

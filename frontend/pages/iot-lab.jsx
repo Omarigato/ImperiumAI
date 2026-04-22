@@ -55,6 +55,7 @@ export default function IoTLabPage() {
           <Link href="/" className="text-gray-300 hover:text-cyan-300">HOME</Link>
           <Link href="/battle" className="text-gray-300 hover:text-cyan-300">BATTLE</Link>
           <Link href="/agents" className="text-gray-300 hover:text-cyan-300">AGENTS</Link>
+          <Link href="/attacks" className="text-gray-300 hover:text-red-400">ATTACKS</Link>
         </div>
       </header>
 

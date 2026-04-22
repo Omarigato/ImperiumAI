@@ -59,6 +59,7 @@ export default function IndexPage() {
           <div className="flex flex-wrap gap-2 text-xs">
             <Link href="/battle" className="px-4 py-2 rounded-lg border border-red-400/50 text-red-200 hover:bg-red-400/10">BATTLE</Link>
             <Link href="/agents" className="px-4 py-2 rounded-lg border border-cyan-300/40 hover:bg-cyan-300/10">AGENTS</Link>
+            <Link href="/attacks" className="px-4 py-2 rounded-lg border border-red-400/40 hover:bg-red-400/10 text-red-200">ATTACKS</Link>
             <Link href="/iot-lab" className="px-4 py-2 rounded-lg border border-emerald-300/40 hover:bg-emerald-300/10">IOT LAB</Link>
             <Link href="/dashboard" className="px-4 py-2 rounded-lg border border-yellow-300/40 hover:bg-yellow-300/10">ANALYTICS</Link>
             <Link href="/batch" className="px-4 py-2 rounded-lg border border-purple-300/40 hover:bg-purple-300/10">BATCH TEST</Link>
@@ -101,6 +102,32 @@ export default function IndexPage() {
             ))}
           </div>
         </section>
+
+        {/* Attack Taxonomy teaser */}
+        <Link href="/attacks">
+          <motion.section
+            className="rounded-2xl border border-red-500/25 bg-slate-900/40 p-5 cursor-pointer hover:bg-red-950/20 transition-colors"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <div className="text-xs tracking-[0.25em] text-red-400/70 mb-1">RESEARCH MODULE</div>
+                <h2 className="text-lg font-bold text-red-300 mb-1">Attack Taxonomy</h2>
+                <p className="text-sm text-gray-400 leading-relaxed max-w-lg">
+                  Full academic classification of all 22 adversarial techniques across 5 attack categories —
+                  mechanism, IoT impact, severity, stealthiness, and defense for each.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-[10px]">
+                {['Prompt Injection', 'Context Manipulation', 'Privilege Escalation', 'Social Engineering', 'Network-Layer'].map((cat) => (
+                  <span key={cat} className="px-2 py-1 rounded border border-red-500/25 text-red-300/70">{cat}</span>
+                ))}
+              </div>
+            </div>
+          </motion.section>
+        </Link>
       </div>
     </div>
   );

@@ -144,6 +144,9 @@ export default function DashboardPage() {
           <Link href="/agents" className="text-xs text-gray-500 hover:text-cyber-cyan tracking-wider">
             AGENTS
           </Link>
+          <Link href="/attacks" className="text-xs text-gray-500 hover:text-red-400 tracking-wider">
+            ATTACKS
+          </Link>
           <Link href="/team" className="text-xs text-gray-500 hover:text-cyber-cyan tracking-wider">
             TEAM
           </Link>
