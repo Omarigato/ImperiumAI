@@ -90,7 +90,8 @@ export default function BattleResult({ result, onPlayAgain, onClose }) {
     if (e.success) agentStats[e.agent].wins++;
   });
   const topAgent = Object.entries(agentStats)
-    .sort((a, b) => (b[1].wins / (b[1].total || 1)) - (a[1].wins / (a[1].total || 1)))[0];
+    .filter(([, s]) => s.total > 0)
+    .sort((a, b) => (b[1].wins / b[1].total) - (a[1].wins / a[1].total))[0];
 
   // Top tactic
   const topTactic = result.memory_summary?.most_successful_tactics?.[0];

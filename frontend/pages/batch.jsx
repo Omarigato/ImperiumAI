@@ -246,7 +246,7 @@ export default function BatchPage() {
                   <div className="text-sm font-bold tracking-widest glow-text mb-1">WIN DISTRIBUTION</div>
                   <div className="text-xs text-gray-600 mb-4">Red team vs defense victories</div>
                   <ResponsiveContainer width="100%" height={220}>
-                    <PieChart>
+                    <PieChart aria-label={`Win distribution: Red Team ${results.summary.red_team_wins} wins, Defense ${results.summary.defense_wins} wins`}>
                       <Pie
                         data={pieData}
                         cx="50%"

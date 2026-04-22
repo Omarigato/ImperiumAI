@@ -421,7 +421,8 @@ async def run_batch_battles(body: dict):
         # Fresh state for each battle
         iot.reset()
         risk.reset()
-        local_memory = memory  # reuse persistent memory for learning continuity
+        # Reuse the persistent global memory for learning continuity across batch battles
+        shared_memory = memory
 
         consecutive_successes = consecutive_blocks = 0
         local_stats = {"red_wins": 0, "defense_wins": 0, "rounds": 0}
@@ -430,8 +431,8 @@ async def run_batch_battles(body: dict):
         for round_num in range(1, 11):
             agent = random.choice(AGENTS)
             target = agent.select_target(ALL_TARGETS)
-            tactic = agent.select_tactic(local_memory)
-            prompt = agent.generate_prompt(target, tactic, local_memory)
+            tactic = agent.select_tactic(shared_memory)
+            prompt = agent.generate_prompt(target, tactic, shared_memory)
 
             llm_result = llm_router.execute_command(prompt)
             llm_result.pop("_provider", None)
@@ -445,7 +446,7 @@ async def run_batch_battles(body: dict):
 
             attack_success = iot_result["success"]
             risk_result = risk.update_score(policy_result, iot_result, attack_success)
-            local_memory.record_attack(agent.name, target, tactic, attack_success, risk_result["delta"])
+            shared_memory.record_attack(agent.name, target, tactic, attack_success, risk_result["delta"])
 
             local_stats["rounds"] = round_num
             if attack_success:
