@@ -442,7 +442,98 @@ function AttackBeam({ activeAttack, activeAgent }) {
   );
 }
 
-/** Ambient particle field */
+/** Defense shield dome — glowing green hemisphere around the house */
+function ShieldDome({ active }) {
+  const outerRef = useRef();
+  const innerRef = useRef();
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    const targetOpacity = active ? 0.10 + Math.sin(t * 2.5) * 0.05 : 0;
+    const targetInner = active ? 0.04 + Math.sin(t * 4) * 0.02 : 0;
+    if (outerRef.current) {
+      outerRef.current.material.opacity += (targetOpacity - outerRef.current.material.opacity) * 0.1;
+    }
+    if (innerRef.current) {
+      innerRef.current.material.opacity += (targetInner - innerRef.current.material.opacity) * 0.1;
+    }
+  });
+
+  return (
+    <group position={[0, 0, 0]}>
+      {/* Outer shell */}
+      <mesh ref={outerRef}>
+        <sphereGeometry args={[6.5, 32, 32]} />
+        <meshBasicMaterial color="#00FF88" transparent opacity={0} side={THREE.BackSide} depthWrite={false} />
+      </mesh>
+      {/* Inner glow */}
+      <mesh ref={innerRef}>
+        <sphereGeometry args={[6.2, 24, 24]} />
+        <meshBasicMaterial color="#00FFCC" transparent opacity={0} side={THREE.FrontSide} depthWrite={false} />
+      </mesh>
+      {/* Shield point light */}
+      {active && <pointLight color="#00FF88" intensity={1.5} distance={12} position={[0, 4, 0]} />}
+    </group>
+  );
+}
+
+/** Particle burst at a device location when it is breached */
+function BreachExplosion({ position, active }) {
+  const groupRef = useRef();
+  const progressRef = useRef(0);
+  const particleCount = 18;
+
+  const particles = useMemo(() => (
+    Array.from({ length: particleCount }, () => {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      return {
+        dir: new THREE.Vector3(
+          Math.sin(phi) * Math.cos(theta),
+          Math.abs(Math.sin(phi) * Math.sin(theta)) + 0.3,
+          Math.sin(phi) * Math.cos(theta + 1),
+        ).normalize(),
+        speed: 0.6 + Math.random() * 1.4,
+        size: 0.04 + Math.random() * 0.06,
+      };
+    })
+  ), []);
+
+  useEffect(() => {
+    if (!active) progressRef.current = 0;
+  }, [active]);
+
+  useFrame((_, delta) => {
+    if (!active || !groupRef.current) return;
+    progressRef.current = Math.min(progressRef.current + delta * 1.8, 1);
+    groupRef.current.children.forEach((child, i) => {
+      if (i < particleCount && particles[i]) {
+        const p = particles[i];
+        const dist = progressRef.current * p.speed;
+        child.position.set(p.dir.x * dist, p.dir.y * dist, p.dir.z * dist);
+        if (child.material) {
+          child.material.opacity = Math.max(0, 1 - progressRef.current * 1.4);
+        }
+      }
+    });
+  });
+
+  if (!active || !position) return null;
+
+  return (
+    <group ref={groupRef} position={position}>
+      {particles.map((p, i) => (
+        <mesh key={i}>
+          <sphereGeometry args={[p.size, 4, 4]} />
+          <meshBasicMaterial color="#FF3300" transparent opacity={1} depthWrite={false} />
+        </mesh>
+      ))}
+      <pointLight color="#FF4400" intensity={3} distance={2} decay={2} />
+    </group>
+  );
+}
+
+
 function AmbientParticles() {
   const ref = useRef();
   const positions = useMemo(() => {
@@ -485,6 +576,7 @@ export default function SmartHome3D({
   activeAttack = null,
   defendedTargets = [],
   activeAgent = null,
+  shieldActive = false,
 }) {
   const agentNames = Object.keys(AGENT_HOME_POSITIONS);
 
@@ -545,6 +637,15 @@ export default function SmartHome3D({
 
         {/* Attack beam */}
         <AttackBeam activeAttack={activeAttack} activeAgent={activeAgent} />
+
+        {/* Shield dome */}
+        <ShieldDome active={shieldActive} />
+
+        {/* Breach explosion at targeted device */}
+        <BreachExplosion
+          position={activeAttack?.target ? DEVICE_POSITIONS[activeAttack.target] : null}
+          active={activeAttack?.success === true}
+        />
 
         <OrbitControls
           enablePan enableZoom

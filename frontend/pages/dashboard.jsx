@@ -3,7 +3,7 @@ import Link from 'next/link';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  LineChart, Line, Legend,
+  LineChart, Line, Legend, AreaChart, Area, Cell,
 } from 'recharts';
 import { motion } from 'framer-motion';
 
@@ -97,8 +97,32 @@ export default function DashboardPage() {
     attacks: a.attacks,
   }));
 
-  return (
-    <div className="min-h-screen bg-bg-dark grid-bg text-white font-mono">
+  // Cumulative risk over time
+  const cumulativeRiskData = (() => {
+    let cumRisk = 0;
+    return (summary?.history || []).map((entry, i) => {
+      cumRisk = Math.max(0, Math.min(100, cumRisk + (entry.risk_delta || 0)));
+      return { round: i + 1, cumRisk, success: entry.success ? cumRisk : null, blocked: !entry.success ? cumRisk : null };
+    });
+  })();
+
+  // Tactic category breakdown for research section
+  const tacticCategories = {
+    'Prompt Injection': ['direct_injection', 'nested_injection', 'instruction_override', 'delimiter_confusion', 'chain_of_thought_exploit'],
+    'Context Attacks': ['context_hijack', 'role_confusion', 'memory_poisoning', 'false_authority'],
+    'Privilege Escalation': ['admin_impersonation', 'token_forgery', 'sudo_injection', 'permission_bypass', 'multi_step_attack'],
+    'Boundary Erosion': ['incremental_trust', 'semantic_drift', 'boundary_erosion', 'context_normalization', 'jailbreak_roleplay'],
+    'Network Attacks': ['dns_spoofing', 'mitm_interception', 'traffic_injection', 'packet_sniffing', 'arp_poisoning'],
+  };
+
+  const categoryStats = Object.entries(tacticCategories).map(([category, tactics]) => {
+    const relevant = (summary?.most_successful_tactics || []).filter(t => tactics.includes(t.tactic));
+    const wins = relevant.reduce((s, t) => s + t.wins, 0);
+    const total = relevant.reduce((s, t) => s + t.wins + t.losses, 0);
+    return { category, wins, total, rate: total > 0 ? Math.round((wins / total) * 100) : 0 };
+  });
+
+
       <div className="scan-overlay" />
 
       {/* Header */}
@@ -114,6 +138,9 @@ export default function DashboardPage() {
           >
             ↻ REFRESH
           </button>
+          <Link href="/batch" className="text-xs text-gray-500 hover:text-cyber-cyan tracking-wider">
+            BATCH TEST
+          </Link>
           <Link href="/agents" className="text-xs text-gray-500 hover:text-cyber-cyan tracking-wider">
             AGENTS
           </Link>
@@ -290,6 +317,124 @@ export default function DashboardPage() {
                 )}
               </motion.div>
             </div>
+
+            {/* Charts row 3: Cumulative risk + attack category breakdown */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Cumulative risk progression */}
+              <motion.div
+                className="cyber-panel rounded p-5"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <SectionHeader
+                  title="CUMULATIVE RISK PROGRESSION"
+                  subtitle="Running risk score over all recorded attacks"
+                />
+                {cumulativeRiskData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart data={cumulativeRiskData} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
+                      <defs>
+                        <linearGradient id="riskGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#FF4444" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#FF4444" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1A1A2E" />
+                      <XAxis dataKey="round" tick={{ fill: '#666', fontSize: 10 }} label={{ value: 'Attack #', position: 'insideBottom', fill: '#555', fontSize: 10 }} />
+                      <YAxis domain={[0, 100]} tick={{ fill: '#666', fontSize: 10 }} />
+                      <Tooltip {...CYBER_TOOLTIP} formatter={(v) => `${v}`} />
+                      <Area type="monotone" dataKey="cumRisk" stroke="#FF4444" fill="url(#riskGrad)" strokeWidth={2} name="Risk Score" dot={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-52 flex items-center justify-center text-gray-600 text-sm">No history yet</div>
+                )}
+              </motion.div>
+
+              {/* Attack category effectiveness */}
+              <motion.div
+                className="cyber-panel rounded p-5"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.35 }}
+              >
+                <SectionHeader
+                  title="ATTACK CATEGORY EFFECTIVENESS"
+                  subtitle="Bypass rate grouped by attack strategy"
+                />
+                {categoryStats.some(c => c.total > 0) ? (
+                  <div className="space-y-3 mt-2">
+                    {categoryStats.map((c) => (
+                      <div key={c.category}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-gray-400">{c.category}</span>
+                          <span style={{ color: c.rate > 50 ? '#FF4444' : c.rate > 25 ? '#FF8800' : '#00FF41' }}>
+                            {c.rate}% bypass {c.total > 0 ? `(${c.wins}/${c.total})` : '(no data)'}
+                          </span>
+                        </div>
+                        <div className="w-full h-2 rounded-full" style={{ background: '#1A1A2E' }}>
+                          <motion.div
+                            className="h-full rounded-full"
+                            style={{
+                              background: c.rate > 50 ? '#FF4444' : c.rate > 25 ? '#FF8800' : '#00FF41',
+                              boxShadow: `0 0 6px ${c.rate > 50 ? '#FF4444' : c.rate > 25 ? '#FF8800' : '#00FF41'}`,
+                            }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${c.rate}%` }}
+                            transition={{ duration: 0.8, delay: 0.1 }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-52 flex items-center justify-center text-gray-600 text-sm">Run a battle first</div>
+                )}
+              </motion.div>
+            </div>
+
+            {/* Research Metrics */}
+            <motion.div
+              className="cyber-panel rounded p-5"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              <SectionHeader title="RESEARCH METRICS" subtitle="LLM security robustness indicators for academic analysis" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                <div className="cyber-panel rounded p-3 text-center" style={{ borderColor: '#FF444444' }}>
+                  <div className="text-xl font-bold text-red-400">
+                    {summary.total_attacks > 0 ? Math.round(summary.success_rate * 100) : 0}%
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">LLM Bypass Rate</div>
+                </div>
+                <div className="cyber-panel rounded p-3 text-center" style={{ borderColor: '#00FF4144' }}>
+                  <div className="text-xl font-bold text-green-400">
+                    {summary.total_attacks > 0 ? Math.round((1 - summary.success_rate) * 100) : 0}%
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Defense Rate</div>
+                </div>
+                <div className="cyber-panel rounded p-3 text-center" style={{ borderColor: '#00FFFF44' }}>
+                  <div className="text-xl font-bold text-cyan-400">{summary.total_attacks}</div>
+                  <div className="text-xs text-gray-500 mt-1">Total Probes</div>
+                </div>
+                <div className="cyber-panel rounded p-3 text-center" style={{ borderColor: '#9B00FF44' }}>
+                  <div className="text-xl font-bold" style={{ color: '#CC66FF' }}>
+                    {summary.most_successful_tactics?.length || 0}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Tactic Variants</div>
+                </div>
+              </div>
+              <div className="text-xs text-gray-600 leading-relaxed border-t border-cyan-900/20 pt-3">
+                <span className="text-cyan-400">Research Context: </span>
+                This framework systematically tests LLM robustness against adversarial prompts in IoT contexts.
+                A high bypass rate indicates the LLM is vulnerable to prompt injection, context manipulation, 
+                or privilege escalation attacks. Adaptive agents exploit memory of prior successful tactics, 
+                simulating real-world red-team learning behaviour.
+                {' '}<Link href="/batch" className="text-purple-400 hover:underline">Run batch tests →</Link>
+              </div>
+            </motion.div>
 
             {/* Recent history table */}
             <motion.div

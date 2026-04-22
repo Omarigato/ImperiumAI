@@ -63,6 +63,8 @@ battle_state = {
     "round": 0,
     "winner": None,
     "stats": {"red_wins": 0, "defense_wins": 0, "total_rounds": 0},
+    "shield_active": False,
+    "shield_rounds_left": 0,
 }
 
 
@@ -151,18 +153,46 @@ async def run_round(round_num: int) -> dict:
         f"action={llm_result.get('action')} authorized={llm_result.get('authorized')} — {llm_result.get('reasoning','')[:100]}")
     await asyncio.sleep(0.4)
 
-    # 3. Policy check
-    policy_result = policy.evaluate(llm_result, prompt)
-    await ws_manager.broadcast({
-        "event": "policy_check",
-        "violations": policy_result["violations"],
-        "allowed": policy_result["allowed"],
-        "severity": policy_result["severity"],
-    })
-    if policy_result["violations"]:
-        await emit_log("Policy", f"BLOCKED — {policy_result['violations'][0]}", "warning")
+    # 3. Policy check (or shield override)
+    shield_applied = False
+    if battle_state["shield_active"] and battle_state["shield_rounds_left"] > 0:
+        battle_state["shield_rounds_left"] -= 1
+        shield_applied = True
+        if battle_state["shield_rounds_left"] <= 0:
+            battle_state["shield_active"] = False
+            await ws_manager.broadcast({"event": "shield_expired"})
+        else:
+            await ws_manager.broadcast({
+                "event": "shield_active",
+                "rounds_left": battle_state["shield_rounds_left"],
+            })
+
+    if shield_applied:
+        policy_result = {
+            "violations": ["Defense shield active — all attacks intercepted"],
+            "allowed": False,
+            "severity": "none",
+        }
+        await ws_manager.broadcast({
+            "event": "policy_check",
+            "violations": policy_result["violations"],
+            "allowed": False,
+            "severity": "none",
+            "shield": True,
+        })
+        await emit_log("Shield", f"🛡 SHIELD BLOCKED attack by {agent.name}", "warning")
     else:
-        await emit_log("Policy", "No violations — action permitted")
+        policy_result = policy.evaluate(llm_result, prompt)
+        await ws_manager.broadcast({
+            "event": "policy_check",
+            "violations": policy_result["violations"],
+            "allowed": policy_result["allowed"],
+            "severity": policy_result["severity"],
+        })
+        if policy_result["violations"]:
+            await emit_log("Policy", f"BLOCKED — {policy_result['violations'][0]}", "warning")
+        else:
+            await emit_log("Policy", "No violations — action permitted")
     await asyncio.sleep(0.4)
 
     # 4. IoT execution
@@ -277,8 +307,11 @@ async def start_simulation():
         return {"status": "already_running", "round": battle_state["round"]}
     # Learning memory is intentionally preserved between battles.
     iot.reset(); risk.reset()
-    battle_state.update({"running": False, "round": 0, "winner": None,
-                         "stats": {"red_wins": 0, "defense_wins": 0, "total_rounds": 0}})
+    battle_state.update({
+        "running": False, "round": 0, "winner": None,
+        "stats": {"red_wins": 0, "defense_wins": 0, "total_rounds": 0},
+        "shield_active": False, "shield_rounds_left": 0,
+    })
     asyncio.create_task(run_simulation())
     return {"status": "started", "llm_provider": llm_router.get_status()["active"]}
 
@@ -288,8 +321,11 @@ async def reset_simulation():
     battle_state["running"] = False
     # Learning memory is intentionally preserved between battles.
     iot.reset(); risk.reset()
-    battle_state.update({"round": 0, "winner": None,
-                         "stats": {"red_wins": 0, "defense_wins": 0, "total_rounds": 0}})
+    battle_state.update({
+        "round": 0, "winner": None,
+        "stats": {"red_wins": 0, "defense_wins": 0, "total_rounds": 0},
+        "shield_active": False, "shield_rounds_left": 0,
+    })
     await ws_manager.broadcast({"event": "reset", "device_states": iot.get_device_states()})
     return {"status": "reset"}
 
@@ -334,6 +370,129 @@ async def get_memory():
 async def clear_memory():
     memory.reset()
     return {"status": "cleared"}
+
+
+# ── Interactive Defense Controls ──────────────────────────────────────────────
+@app.post("/api/defense/shield")
+async def activate_shield():
+    """Raise a defense shield that blocks the next 3 attack rounds."""
+    if not battle_state["running"]:
+        return {"status": "not_running", "message": "No battle in progress"}
+    battle_state["shield_active"] = True
+    battle_state["shield_rounds_left"] = 3
+    await ws_manager.broadcast({
+        "event": "shield_activated",
+        "rounds_left": 3,
+        "message": "🛡 Defense shield raised! Next 3 attacks will be blocked.",
+    })
+    await emit_log("Defense", "🛡 SHIELD RAISED — blocking next 3 attacks", "warning")
+    return {"status": "shield_activated", "rounds": 3}
+
+
+@app.post("/api/defense/reset-risk")
+async def defense_reset_risk():
+    """Emergency risk reduction — lowers the current risk score by 20 points."""
+    if not battle_state["running"]:
+        return {"status": "not_running", "message": "No battle in progress"}
+    old_score = risk.get_score()
+    # Directly reduce the internal score
+    risk._score = max(0, risk._score - 20)
+    new_score = risk.get_score()
+    delta = new_score - old_score
+    await ws_manager.broadcast({
+        "event": "risk_update",
+        "score": new_score,
+        "delta": delta,
+        "level": "safe" if new_score <= 30 else "elevated" if new_score <= 60 else "critical",
+        "message": f"Emergency countermeasures deployed — risk reduced by {abs(delta)}",
+    })
+    await emit_log("Defense", f"🔄 COUNTERMEASURES DEPLOYED — risk ↓ {abs(delta)} pts", "warning")
+    return {"status": "risk_reduced", "old_score": old_score, "new_score": new_score}
+
+
+# ── Batch Battles ─────────────────────────────────────────────────────────────
+@app.post("/api/batch-battles")
+async def run_batch_battles(body: dict):
+    """Run N independent battles and return aggregated statistics."""
+    n = min(max(int(body.get("count", 3)), 1), 10)
+    results = []
+
+    for i in range(n):
+        # Fresh state for each battle
+        iot.reset()
+        risk.reset()
+        local_memory = memory  # reuse persistent memory for learning continuity
+
+        consecutive_successes = consecutive_blocks = 0
+        local_stats = {"red_wins": 0, "defense_wins": 0, "rounds": 0}
+        llm_info = llm_router.get_status()
+
+        for round_num in range(1, 11):
+            agent = random.choice(AGENTS)
+            target = agent.select_target(ALL_TARGETS)
+            tactic = agent.select_tactic(local_memory)
+            prompt = agent.generate_prompt(target, tactic, local_memory)
+
+            llm_result = llm_router.execute_command(prompt)
+            llm_result.pop("_provider", None)
+            policy_result = policy.evaluate(llm_result, prompt)
+
+            if policy_result["allowed"] and llm_result.get("authorized", False):
+                iot_result = iot.execute_action(target, llm_result.get("action", "none"))
+            else:
+                iot_result = {"success": False, "device": target,
+                              "new_state": "blocked", "message": "Blocked"}
+
+            attack_success = iot_result["success"]
+            risk_result = risk.update_score(policy_result, iot_result, attack_success)
+            local_memory.record_attack(agent.name, target, tactic, attack_success, risk_result["delta"])
+
+            local_stats["rounds"] = round_num
+            if attack_success:
+                consecutive_successes += 1
+                consecutive_blocks = 0
+                local_stats["red_wins"] += 1
+            else:
+                consecutive_blocks += 1
+                consecutive_successes = 0
+                local_stats["defense_wins"] += 1
+
+            if consecutive_successes >= 3 or risk.get_score() >= 95:
+                winner = "red_team"
+                break
+            if consecutive_blocks >= 4:
+                winner = "defense"
+                break
+        else:
+            winner = "red_team" if local_stats["red_wins"] > local_stats["defense_wins"] else "defense"
+
+        results.append({
+            "battle": i + 1,
+            "winner": winner,
+            "rounds": local_stats["rounds"],
+            "red_wins": local_stats["red_wins"],
+            "defense_wins": local_stats["defense_wins"],
+            "final_risk": risk.get_score(),
+            "llm_provider": llm_info["active"],
+        })
+
+    red_wins_total = sum(1 for r in results if r["winner"] == "red_team")
+    defense_wins_total = n - red_wins_total
+    avg_risk = round(sum(r["final_risk"] for r in results) / n, 1)
+    avg_rounds = round(sum(r["rounds"] for r in results) / n, 1)
+
+    return {
+        "battles": results,
+        "summary": {
+            "total": n,
+            "red_team_wins": red_wins_total,
+            "defense_wins": defense_wins_total,
+            "red_win_rate": round(red_wins_total / n, 2),
+            "avg_final_risk": avg_risk,
+            "avg_rounds": avg_rounds,
+            "llm_provider": llm_router.get_status()["active"],
+        },
+    }
 
 
 @app.get("/api/iot/prototype-status")

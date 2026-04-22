@@ -42,6 +42,11 @@ export default function BattlePage() {
   const [attackTicker, setAttackTicker] = useState([]);
   // "thought bubble" shown above the 3D scene
   const [thoughtBubble, setThoughtBubble] = useState(null);
+  // Interactive defense
+  const [shieldActive, setShieldActive] = useState(false);
+  const [shieldRoundsLeft, setShieldRoundsLeft] = useState(0);
+  const [shieldCooldown, setShieldCooldown] = useState(false);
+  const [riskResetting, setRiskResetting] = useState(false);
   const logIdRef = useRef(0);
 
   const addLog = useCallback((source, message, level = 'info') => {
@@ -138,7 +143,24 @@ export default function BattlePage() {
 
       wsService.on('reset', data => {
         if (data.device_states) setDeviceStates(data.device_states);
+        setShieldActive(false); setShieldRoundsLeft(0);
         addLog('System', 'Simulation reset');
+      }),
+
+      wsService.on('shield_activated', data => {
+        setShieldActive(true);
+        setShieldRoundsLeft(data.rounds_left || 3);
+        addLog('Defense', `🛡 SHIELD RAISED — ${data.rounds_left || 3} rounds of protection`, 'warning');
+      }),
+
+      wsService.on('shield_active', data => {
+        setShieldRoundsLeft(data.rounds_left || 0);
+      }),
+
+      wsService.on('shield_expired', () => {
+        setShieldActive(false);
+        setShieldRoundsLeft(0);
+        addLog('Defense', '🔓 Shield expired — attacks resume', 'warning');
       }),
     ];
 
@@ -177,6 +199,24 @@ export default function BattlePage() {
   };
 
   const handlePlayAgain = async () => { await resetSimulation(); await startSimulation(); };
+
+  const handleRaiseShield = async () => {
+    if (shieldCooldown || !running) return;
+    try {
+      await fetch(`${API}/api/defense/shield`, { method: 'POST' });
+      setShieldCooldown(true);
+      setTimeout(() => setShieldCooldown(false), 12000);
+    } catch { addLog('System', 'Shield failed', 'error'); }
+  };
+
+  const handleResetRisk = async () => {
+    if (riskResetting || !running) return;
+    try {
+      setRiskResetting(true);
+      await fetch(`${API}/api/defense/reset-risk`, { method: 'POST' });
+      setTimeout(() => setRiskResetting(false), 8000);
+    } catch { addLog('System', 'Countermeasures failed', 'error'); }
+  };
 
   const agentColor = AGENTS_META.find(a => a.name === activeAgent)?.color;
 
@@ -237,6 +277,7 @@ export default function BattlePage() {
               defendedTargets={defendedTargets}
               activeAgent={activeAgent}
               agentsMeta={AGENTS_META}
+              shieldActive={shieldActive}
             />
 
             {/* Thought bubble overlay */}
@@ -296,6 +337,40 @@ export default function BattlePage() {
               >
                 ↺ RESET
               </button>
+            </div>
+
+            {/* Defense Controls */}
+            <div className="flex flex-col gap-1.5 justify-center">
+              <motion.button
+                onClick={handleRaiseShield}
+                disabled={!running || shieldCooldown || shieldActive}
+                className="btn-cyber py-2 px-3 rounded text-xs font-bold tracking-wider"
+                style={{
+                  color: shieldActive ? '#00FF88' : (shieldCooldown || !running) ? '#555' : '#0A0A0F',
+                  backgroundColor: shieldActive ? '#00FF8833' : (shieldCooldown || !running) ? '#1A1A2E' : '#00FF88',
+                  border: `1px solid ${shieldActive ? '#00FF88' : (shieldCooldown || !running) ? '#333' : '#00FF88'}`,
+                  boxShadow: shieldActive ? '0 0 14px #00FF8866' : 'none',
+                  cursor: (!running || shieldCooldown || shieldActive) ? 'not-allowed' : 'pointer',
+                }}
+                whileHover={running && !shieldCooldown && !shieldActive ? { scale: 1.04 } : {}}
+                animate={shieldActive ? { boxShadow: ['0 0 8px #00FF8844', '0 0 20px #00FF8888', '0 0 8px #00FF8844'] } : {}}
+                transition={{ duration: 0.8, repeat: shieldActive ? Infinity : 0 }}
+              >
+                {shieldActive ? `🛡 SHIELD ${shieldRoundsLeft}r` : shieldCooldown ? '⏳ COOLDOWN' : '🛡 RAISE SHIELD'}
+              </motion.button>
+              <motion.button
+                onClick={handleResetRisk}
+                disabled={!running || riskResetting}
+                className="btn-cyber py-1.5 px-3 rounded text-xs tracking-wider"
+                style={{
+                  color: riskResetting ? '#555' : (!running) ? '#555' : '#00CCFF',
+                  border: `1px solid ${riskResetting || !running ? '#333' : '#00CCFF55'}`,
+                  cursor: (!running || riskResetting) ? 'not-allowed' : 'pointer',
+                }}
+                whileHover={running && !riskResetting ? { scale: 1.04 } : {}}
+              >
+                {riskResetting ? '⏳ DEPLOYING…' : '🔄 COUNTERMEASURES'}
+              </motion.button>
             </div>
           </div>
 
