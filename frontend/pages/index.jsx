@@ -23,8 +23,8 @@ export default function IndexPage() {
             {h.titleLine1}
             <span className="hero-title-accent"> {h.titleLine2}</span>
           </motion.h1>
-          <p className="hero-alt-lang">{h.titleRu}</p>
-          <p className="hero-alt-lang">{h.titleKz}</p>
+          <p className="hero-alt-lang">{h.altTitle1}</p>
+          <p className="hero-alt-lang">{h.altTitle2}</p>
           <div className="hero-cta">
             <Link href="/battle" className="btn-primary">
               {h.startBtn}

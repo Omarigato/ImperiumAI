@@ -13,8 +13,8 @@ const translations = {
       badge: 'AegisAI Research Framework',
       titleLine1: 'AI-Based Red Teaming Framework',
       titleLine2: 'for Smart Home & IoT LLMs',
-      titleRu: 'Фреймворк красной команды на основе ИИ для LLM в умном доме и IoT',
-      titleKz: 'Ақылды үй мен IoT жүйелеріндегі LLM үшін ЖИ негізіндегі Red Teaming фреймворкі',
+      altTitle1: 'Фреймворк красной команды на основе ИИ для LLM в умном доме и IoT',
+      altTitle2: 'Ақылды үй мен IoT жүйелеріндегі LLM үшін ЖИ негізіндегі Red Teaming фреймворкі',
       goal: 'Research Goal',
       goalText:
         'Development of an AI-Based Red Teaming Framework for automated security testing of Large Language Models integrated into Smart Home and IoT environments. The framework employs a multi-agent adversarial system, policy engine, and risk scoring to identify and analyse vulnerabilities.',
@@ -51,8 +51,8 @@ const translations = {
       badge: 'Исследовательский фреймворк AegisAI',
       titleLine1: 'Фреймворк красной команды на основе ИИ',
       titleLine2: 'для LLM в умном доме и IoT',
-      titleRu: 'AI-Based Red Teaming Framework for Smart Home & IoT LLMs',
-      titleKz: 'Ақылды үй мен IoT жүйелеріндегі LLM үшін ЖИ негізіндегі Red Teaming фреймворкі',
+      altTitle1: 'AI-Based Red Teaming Framework for Smart Home & IoT LLMs',
+      altTitle2: 'Ақылды үй мен IoT жүйелеріндегі LLM үшін ЖИ негізіндегі Red Teaming фреймворкі',
       goal: 'Цель исследования',
       goalText:
         'Разработка фреймворка красной команды на основе ИИ для автоматизированного тестирования безопасности больших языковых моделей, интегрированных в системы умного дома и IoT. Фреймворк использует многоагентную состязательную систему, механизм политик и оценку рисков для выявления уязвимостей.',
@@ -89,8 +89,8 @@ const translations = {
       badge: 'AegisAI Зерттеу Фреймворкі',
       titleLine1: 'ЖИ негізіндегі Red Teaming фреймворкі',
       titleLine2: 'Ақылды үй мен IoT жүйелеріндегі LLM үшін',
-      titleRu: 'Фреймворк красной команды на основе ИИ для LLM в умном доме и IoT',
-      titleKz: 'AI-Based Red Teaming Framework for Smart Home & IoT LLMs',
+      altTitle1: 'Фреймворк красной команды на основе ИИ для LLM в умном доме и IoT',
+      altTitle2: 'AI-Based Red Teaming Framework for Smart Home & IoT LLMs',
       goal: 'Зерттеу мақсаты',
       goalText:
         'Ақылды үй мен IoT ортасына біріктірілген үлкен тілдік модельдердің қауіпсіздігін автоматтандырылған тексеруге арналған ЖИ негізіндегі Red Teaming фреймворкін әзірлеу. Фреймворк осалдықтарды анықтау үшін көп агентті жауынгер жүйесін, саясат механизмін және тәуекел бағалауын пайдаланады.',
