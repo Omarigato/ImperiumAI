@@ -239,7 +239,7 @@ export default function BattlePage() {
           </div>
           <a href="/" className="text-xs text-gray-600 hover:text-cyber-cyan transition-colors">HOME</a>
           <a href="/agents" className="text-xs text-gray-600 hover:text-cyber-cyan transition-colors">AGENTS</a>
-          <a href="/iot-lab" className="text-xs text-gray-600 hover:text-cyber-cyan transition-colors">IOT LAB</a>
+          <a href="/attacks" className="text-xs text-gray-600 hover:text-red-400 transition-colors">ATTACKS</a>
           <a href="/dashboard" className="text-xs text-gray-600 hover:text-cyber-cyan transition-colors">ANALYTICS</a>
         </div>
       </header>

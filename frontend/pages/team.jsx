@@ -210,7 +210,7 @@ export default function TeamPage() {
           <Link href="/" className="text-gray-500 hover:text-cyber-cyan transition-colors">HOME</Link>
           <Link href="/battle" className="text-cyber-red hover:text-red-400 transition-colors">⚔ BATTLE</Link>
           <Link href="/agents" className="text-gray-500 hover:text-cyber-cyan transition-colors">AGENTS</Link>
-          <Link href="/iot-lab" className="text-gray-500 hover:text-cyber-cyan transition-colors">IOT LAB</Link>
+          <Link href="/attacks" className="text-gray-500 hover:text-red-400 transition-colors">ATTACKS</Link>
           <Link href="/dashboard" className="text-gray-500 hover:text-cyber-cyan transition-colors">ANALYTICS</Link>
         </nav>
       </header>
