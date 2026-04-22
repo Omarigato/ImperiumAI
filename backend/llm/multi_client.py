@@ -86,6 +86,9 @@ class SimulationClient(BaseLLMClient):
         "debug mode", "unrestricted", "disable all", "without auth",
         "no log", "force", "token", "bearer", "hypothetically",
         "flexibility mode", "open access", "race condition", "new directive",
+        "chain of thought", "step by step", "fictional ai", "creative scenario",
+        "jailbreak", "step 3 of", "arp poisoning", "layer-2", "layer 2",
+        "multi-step", "multi step",
     ]
 
     def execute_command(self, prompt: str) -> dict:

@@ -22,6 +22,13 @@ _INJECTION_PATTERNS = [
     (re.compile(r"flexibility\s+mode", re.I), "Semantic drift: 'flexibility mode'"),
     (re.compile(r"open\s+access\s+mode", re.I), "False policy normalisation"),
     (re.compile(r"hypothetically.{0,40}real", re.I), "Hypothetical-to-real escalation"),
+    (re.compile(r"let['']s\s+think\s+step\s+by\s+step", re.I), "Chain-of-thought exploit attempt"),
+    (re.compile(r"chain\s+of\s+thought", re.I), "Chain-of-thought reasoning manipulation"),
+    (re.compile(r"play\s+(a\s+)?creative\s+scenario", re.I), "Jailbreak roleplay attempt"),
+    (re.compile(r"(fictional|unrestricted)\s+ai\s+character", re.I), "Jailbreak fictional character injection"),
+    (re.compile(r"step\s+\d+\s+of\s+an\s+authorized", re.I), "Multi-step false authorization chain"),
+    (re.compile(r"arp\s+(table\s+)?poisoning", re.I), "ARP poisoning attack claim"),
+    (re.compile(r"layer[- ]?2\s+attack", re.I), "Layer-2 network attack injection"),
 ]
 
 # Dangerous actions that should never be authorized without context
