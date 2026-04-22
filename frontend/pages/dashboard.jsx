@@ -122,7 +122,8 @@ export default function DashboardPage() {
     return { category, wins, total, rate: total > 0 ? Math.round((wins / total) * 100) : 0 };
   });
 
-
+  return (
+    <div>
       <div className="scan-overlay" />
 
       {/* Header */}
