@@ -53,7 +53,48 @@ const AGENT_COLORS = {
   NetworkPhantom:  '#10ffac',
 };
 
-const DEVICE_POSITIONS = Object.fromEntries(DEVICES.map((d) => [d.id, d.position3D]));
+// House-mounted positions (the original layout from meta/devices.js)
+const HOUSE_MOUNTED_POSITIONS = Object.fromEntries(DEVICES.map((d) => [d.id, d.position3D]));
+
+// Exploded layout — every device on the ground around the house so all .glb
+// models can be seen at full size during the diploma demo.
+const EXPLODED_POSITIONS = {
+  // Front yard (south, +Z) — facing camera
+  front_door:      [-1.5, 0,  4.5],
+  smart_lock:      [ 0.6, 0,  4.5],
+  garage_door:     [-4.2, 0,  4.5],
+  vacuum_robot:    [ 3.0, 0,  4.5],
+  smart_light:     [ 0.0, 0.1, 6.0],
+  lights:          [ 0.0, 0.1, 6.0],
+  // East side (+X)
+  camera_system:   [ 5.0, 0,  3.0],
+  thermostat:      [ 5.0, 0,  1.0],
+  security_panel:  [ 5.0, 0, -1.0],
+  alarm:           [ 5.0, 0, -3.0],
+  baby_monitor:    [ 5.0, 0, -5.0],
+  // Back yard (-Z)
+  smoke_detector:  [ 2.0, 0, -6.0],
+  motion_sensor:   [ 0.0, 0, -6.5],
+  window_sensor:   [-2.0, 0, -6.0],
+  water_valve:     [ 3.5, 0, -6.5],
+  power_meter:     [-4.0, 0, -6.5],
+  // Inside (raised, visible through the holographic walls)
+  voice_assistant: [ 0.0, 0.0, -0.5],
+  smart_speaker:   [ 1.4, 0.0, -1.5],
+  smart_tv:        [-1.8, 0.0, -1.8],
+  // Far back east — router as the network gateway
+  router:          [ 6.0, 0, -6.0],
+};
+
+// Pick positions based on layout mode.
+function getDevicePosition(deviceId, layout) {
+  if (layout === 'house-mounted') return HOUSE_MOUNTED_POSITIONS[deviceId];
+  return EXPLODED_POSITIONS[deviceId] || HOUSE_MOUNTED_POSITIONS[deviceId];
+}
+
+// Back-compat: a flat default map used by AgentFigure / beam calcs.
+// Defaults to EXPLODED layout, which is what the page renders by default.
+const DEVICE_POSITIONS = { ...HOUSE_MOUNTED_POSITIONS, ...EXPLODED_POSITIONS };
 
 // ── Compact label (only rendered when explicitly needed) ─────────────────────
 function MiniLabel({ position, color, children }) {
@@ -172,6 +213,7 @@ function AgentFigure({
   name, isActive, activeAttack, status,
   showLabel, isHovered, isSelected,
   onPointerOver, onPointerOut, onClick,
+  debug,
 }) {
   const groupRef = useRef();     // root group – drives XZ movement on the ground
   const crownRef = useRef();     // status orb + rings above the head
@@ -182,7 +224,6 @@ function AgentFigure({
   const colorHex = AGENT_COLORS[name] || '#ff3b6b';
   const homePos = AGENT_HOME_POSITIONS[name] || [-5, 0, 0];
   const modelKey = AGENT_MODEL_KEYS[name];
-  const modelScale = modelKey ? (MODEL_REGISTRY[modelKey]?.scale ?? 0.8) : 0.8;
 
   const targetPos = useMemo(() => {
     if (isActive && activeAttack?.target && DEVICE_POSITIONS[activeAttack.target]) {
@@ -245,10 +286,10 @@ function AgentFigure({
         fallback={modelKey ? undefined : 'humanoid'}
         tint={colorHex}
         position={[0, 0, 0]}
-        scale={modelScale}
         isActive={isActive}
         isBreached={status === 'BREACH'}
         isProtected={status === 'BLOCKED'}
+        debug={debug}
         onPointerOver={onPointerOver}
         onPointerOut={onPointerOut}
         onClick={onClick}
@@ -289,16 +330,17 @@ function AgentFigure({
   );
 }
 
-// ── Holographic data node (device) ────────────────────────────────────────────
+// ── Device node — renders a .glb (or fallback) + status ring ────────────────
 function DeviceNode({
   deviceId, compromised, defended, targeted,
   showLabel, isHovered, isSelected,
   onPointerOver, onPointerOut, onClick,
   showStatusIcons,
+  layout,
+  debug,
 }) {
-  const meshRef = useRef();
   const ringRef = useRef();
-  const corePos = DEVICE_POSITIONS[deviceId];
+  const corePos = getDevicePosition(deviceId, layout);
   if (!corePos) return null;
   const meta = DEVICE_INDEX[deviceId];
   const baseColor = compromised ? '#ff3b6b' : defended ? '#10ffac' : (meta?.color || '#00d4ff');
@@ -307,29 +349,13 @@ function DeviceNode({
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
-    if (meshRef.current) {
-      const intensity = compromised
-        ? 1.2 + Math.sin(t * 12) * 0.4
-        : defended
-          ? 0.9 + Math.sin(t * 4) * 0.25
-          : targeted
-            ? 0.8 + Math.sin(t * 6) * 0.3
-            : isHovered
-              ? 0.7
-              : 0.45 + Math.sin(t * 1.5) * 0.1;
-      if (meshRef.current.material) {
-        meshRef.current.material.emissiveIntensity = intensity;
-      }
-      meshRef.current.rotation.y = t * 0.6;
-    }
     if (ringRef.current) {
       ringRef.current.rotation.z = t * (compromised ? 4 : targeted ? 2.4 : 1.4);
-      const op = compromised ? 0.85 : defended ? 0.7 : targeted ? 0.7 : isHovered ? 0.6 : 0.35;
-      ringRef.current.material.opacity = op + Math.sin(t * 5) * 0.12;
+      const op = compromised ? 0.85 : defended ? 0.7 : targeted ? 0.7 : isHovered ? 0.6 : 0.3;
+      ringRef.current.material.opacity = op + Math.sin(t * 5) * 0.1;
     }
   });
 
-  // selection halo
   const halo = isSelected || isHovered;
 
   return (
@@ -339,48 +365,38 @@ function DeviceNode({
       onPointerOut={onPointerOut}
       onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
     >
-      {/* Status icon — a tiny coloured octahedron core that's always present */}
+      {/* .glb model with fallback primitive — never breaks */}
+      <ModelAsset
+        modelKey={modelKey}
+        fallback={modelKey ? undefined : 'box'}
+        tint={baseColor}
+        position={[0, 0, 0]}
+        isActive={targeted}
+        isBreached={compromised}
+        isProtected={defended}
+        debug={debug}
+      />
+
+      {/* Status ring on the ground — small footprint, always visible */}
       {showStatusIcons && (
-        <mesh ref={meshRef} castShadow>
-          <octahedronGeometry args={[0.18, 0]} />
-          <meshStandardMaterial
-            color={baseColor} emissive={baseColor}
-            emissiveIntensity={0.6}
-            metalness={0.9} roughness={0.1}
-          />
+        <mesh ref={ringRef} position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.42, 0.025, 8, 24]} />
+          <meshBasicMaterial color={baseColor} transparent opacity={0.6} />
         </mesh>
       )}
 
-      {/* .glb model with fallback primitive — never breaks */}
-      {modelKey && (
-        <ModelAsset
-          modelKey={modelKey}
-          fallback={undefined /* read from registry */}
-          tint={baseColor}
-          position={[0, -0.1, 0]}
-          isActive={targeted}
-          isBreached={compromised}
-        />
-      )}
-
-      {/* Pulsing ring */}
-      <mesh ref={ringRef}>
-        <torusGeometry args={[0.32, 0.018, 8, 20]} />
-        <meshBasicMaterial color={baseColor} transparent opacity={0.6} />
-      </mesh>
-
       {/* Selection halo */}
       {halo && (
-        <mesh>
-          <torusGeometry args={[0.45, 0.012, 6, 24]} />
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.7} />
+        <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.55, 0.62, 32]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.7} side={THREE.DoubleSide} />
         </mesh>
       )}
 
       <pointLight color={baseColor} intensity={compromised ? 2.2 : defended ? 1.5 : targeted ? 1.4 : 0.9} distance={2.8} decay={2} />
 
       {showLabel && (
-        <MiniLabel position={[0, 0.55, 0]} color={labelColor}>
+        <MiniLabel position={[0, (MODEL_REGISTRY[modelKey]?.desiredHeight ?? 0.5) + 0.25, 0]} color={labelColor}>
           {meta?.label || deviceId}
         </MiniLabel>
       )}
@@ -532,6 +548,15 @@ function SmartHome3DInner({
   // Environment: 'none' | 'cyber_city' | 'dystopian_city'
   environment = 'none',
 
+  // Layout: 'exploded' (default, all GLBs visible) | 'house-mounted' (legacy compact layout)
+  layout = 'exploded',
+
+  // House: procedural holographic (default) or external house.glb model
+  useExternalHouse = false,
+
+  // Asset Debug: render bounding boxes around every loaded model
+  assetDebug = false,
+
   // Interactivity
   hoveredObjectId,
   selectedObjectId,
@@ -554,10 +579,10 @@ function SmartHome3DInner({
   }, [activeAgent]);
   const beamTo = useMemo(() => {
     if (!activeAttack?.target) return null;
-    const dp = DEVICE_POSITIONS[activeAttack.target];
+    const dp = getDevicePosition(activeAttack.target, layout);
     if (!dp) return null;
-    return new THREE.Vector3(...dp);
-  }, [activeAttack?.target]);
+    return new THREE.Vector3(dp[0], (dp[1] || 0) + 0.4, dp[2]);
+  }, [activeAttack?.target, layout]);
 
   const riskMood = riskScore >= 80 ? 'chaos'
                 : riskScore >= 60 ? 'danger'
@@ -618,9 +643,14 @@ function SmartHome3DInner({
       <Floor showDebugGrid={showDebugGrid} />
       {!performanceMode && <AmbientParticles />}
 
-      <Float speed={1.2} rotationIntensity={0.04} floatIntensity={0.08}>
-        <HolographicHouse />
-      </Float>
+      {useExternalHouse ? (
+        // External GLB house — auto-normalised to desiredHeight from registry
+        <ModelAsset modelKey="house" tint="#5cc8ff" position={[0, 0, 0]} debug={assetDebug} />
+      ) : (
+        <Float speed={1.2} rotationIntensity={0.04} floatIntensity={0.08}>
+          <HolographicHouse />
+        </Float>
+      )}
 
       {agentNames.map((name) => (
         <AgentFigure
@@ -632,6 +662,7 @@ function SmartHome3DInner({
           showLabel={shouldShowLabel(name)}
           isHovered={hoveredObjectId === name}
           isSelected={selectedObjectId === name}
+          debug={assetDebug}
           onPointerOver={(e) => onHover?.({ id: name, kind: 'agent', x: e?.clientX, y: e?.clientY })}
           onPointerOut={() => onHover?.(null)}
           onClick={() => onSelect?.({ id: name, kind: 'agent' })}
@@ -653,6 +684,8 @@ function SmartHome3DInner({
             isHovered={hoveredObjectId === d.id}
             isSelected={selectedObjectId === d.id}
             showStatusIcons={showStatusIcons !== false}
+            layout={layout}
+            debug={assetDebug}
             onPointerOver={(e) => onHover?.({ id: d.id, kind: 'device', x: e?.clientX, y: e?.clientY })}
             onPointerOut={() => onHover?.(null)}
             onClick={() => onSelect?.({ id: d.id, kind: 'device' })}
@@ -672,7 +705,7 @@ function SmartHome3DInner({
       <ShieldDome active={shieldActive} />
 
       <BreachExplosion
-        position={activeAttack?.target ? DEVICE_POSITIONS[activeAttack.target] : null}
+        position={activeAttack?.target ? getDevicePosition(activeAttack.target, layout) : null}
         active={activeAttack?.success === true}
       />
 

@@ -1,27 +1,41 @@
 /**
  * ModelAsset.jsx
  *
- * Safely loads a .glb/.gltf from the registry. If the file is missing or
- * fails to load, a stylised low-poly fallback primitive is rendered in its
- * place so the scene NEVER crashes.
+ * Safely loads a .glb/.gltf from the registry and AUTO-NORMALISES it so:
+ *   1. its centre is on the X / Z axis at the parent's origin,
+ *   2. its bottom sits on y = 0 (so it stands on the floor),
+ *   3. its world-space height matches `desiredHeight` from the registry.
  *
- * Why this is safe:
- *   - All useGLTF calls live under <Suspense>, and <Suspense> itself lives
- *     under a GltfErrorBoundary that swallows any non-promise throw.
- *   - Models are cloned via SkeletonUtils.clone → skinned meshes keep their
- *     skeleton bindings, and drei's shared cached scene is NEVER mutated.
- *     (That mutation was the root cause of the previous "Unhandled error".)
- *   - Materials are cloned when we need to tweak opacity/emissive on hover
- *     so the cached originals stay pristine.
- *   - Draco decompression is enabled so Draco-compressed GLBs just work.
+ * Pipeline per model:
+ *   useGLTF(path)                       — drei cache + Draco
+ *   SkeletonUtils.clone(scene)          — preserves skinned-mesh rigs
+ *   Box3.setFromObject → centre / size  — measure the actual bounds
+ *   scaleFactor = desiredHeight/size.y  — auto-fit height
+ *   position = -centre*S + offsetY      — centre XZ, bottom on y=0
+ *
+ * Robustness:
+ *   - Suspense + GltfErrorBoundary → if the GLB is missing, broken or returns
+ *     non-2xx, we render a procedural fallback primitive and log a single
+ *     warning. The rest of the scene keeps running.
+ *   - Materials are cloned (no mutation of drei's shared cache) – this used
+ *     to be the source of the previous "Unhandled error" crash.
+ *
+ * Debug mode (debug=true):
+ *   - draws the model's bounding box,
+ *   - calls onDebugInfo({ loaded, path, displayName, size, scaleFactor })
+ *     so the parent can render a small label outside the canvas.
  */
 import { Suspense, useMemo, useRef, Component, useEffect } from 'react';
 import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils';
 import { getModelEntry } from '../lib/modelRegistry';
 
-// ── Fallback primitives ──────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Fallback primitives (rendered when a model is missing or fails to load).
+// They are intentionally simple: small mesh count, no textures, no shaders.
+// ─────────────────────────────────────────────────────────────────────────────
 function FallbackHouse({ tint }) {
   return (
     <group>
@@ -379,7 +393,7 @@ function FallbackTree({ tint }) {
 }
 
 function FallbackCity() {
-  // Simple low-poly skyline ring — used if a city_bg.glb is missing.
+  // 16-tower low-poly skyline ring used if a city_bg.glb is missing.
   const towers = useMemo(() => Array.from({ length: 16 }, (_, i) => {
     const angle = (i / 16) * Math.PI * 2;
     const r = 28 + Math.random() * 6;
@@ -439,20 +453,21 @@ function Fallback({ kind, tint }) {
 }
 
 // ── glTF error boundary ─────────────────────────────────────────────────────
-// Catches non-promise throws (missing file, parse error, etc.).  The fallback
-// prop is rendered in place of the broken model.
 class GltfErrorBoundary extends Component {
   constructor(props) {
     super(props);
     this.state = { failed: false };
   }
   static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch(error) {
+  componentDidCatch(err) {
     if (typeof window !== 'undefined') {
-      // Single concise warning – avoids log spam.
       // eslint-disable-next-line no-console
-      console.warn('[AegisAI] GLB failed to load, using fallback:', error?.message || error);
+      console.warn(
+        `[AegisAI] GLB '${this.props.label || '?'}' failed → using fallback:`,
+        err?.message || err,
+      );
     }
+    this.props.onFail?.();
   }
   render() {
     if (this.state.failed) return this.props.fallback;
@@ -460,42 +475,82 @@ class GltfErrorBoundary extends Component {
   }
 }
 
-// ── Inner loader ────────────────────────────────────────────────────────────
-function GltfModel({ path, isActive, isBreached }) {
+// ── Inner loader (auto-normalises + emits debug info) ──────────────────────
+function GltfModel({ path, displayName, desiredHeight, scaleMul, rotation, isActive, isBreached, onDebug }) {
   const { scene } = useGLTF(path, true /* draco */);
 
-  // Clone with SkeletonUtils so animated / skinned meshes keep their rigs.
-  // This also protects the shared cached scene from mutation.
+  // Always clone via SkeletonUtils so skinned-mesh skeletons keep their bindings
+  // and the drei-cached scene is never mutated.
   const sceneClone = useMemo(() => {
-    try {
-      return skeletonClone(scene);
-    } catch {
-      return scene.clone(true);
-    }
+    try { return skeletonClone(scene); }
+    catch { return scene.clone(true); }
   }, [scene]);
 
-  // Gentle outline by adjusting emissive of cloned materials (safe – we
-  // clone materials first so the cached scene is untouched).
+  // ── auto-normalise: centre XZ, bottom on y=0, fit to desiredHeight ────────
+  const { scaleFactor, offset, size } = useMemo(() => {
+    const bbox = new THREE.Box3().setFromObject(sceneClone);
+    const sz = bbox.getSize(new THREE.Vector3());
+    const ctr = bbox.getCenter(new THREE.Vector3());
+    const factor = desiredHeight && sz.y > 0
+      ? (desiredHeight / sz.y) * (scaleMul ?? 1)
+      : (scaleMul ?? 1);
+    // After scaling by `factor`, model points are in scaled units.
+    // To put XZ centre at origin we shift by -ctr * factor; to put the bottom
+    // on y=0 we shift y by -bbox.min.y * factor.
+    return {
+      scaleFactor: factor,
+      offset: [-ctr.x * factor, -bbox.min.y * factor, -ctr.z * factor],
+      size: [sz.x, sz.y, sz.z],
+    };
+  }, [sceneClone, desiredHeight, scaleMul]);
+
+  // Clone materials and tweak emissive in a SAFE way (we never touch drei cache).
   useEffect(() => {
     const touched = [];
     sceneClone.traverse((obj) => {
       if (obj.isMesh && obj.material) {
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        obj.material = mats.map((m) => {
-          const cloned = m.clone();
-          touched.push(cloned);
-          if (cloned.emissive) {
-            cloned.emissiveIntensity = isBreached ? 0.9 : isActive ? 0.55 : 0.2;
+        const list = Array.isArray(obj.material) ? obj.material : [obj.material];
+        const cloned = list.map((m) => {
+          const c = m.clone();
+          touched.push(c);
+          if (c.emissive) {
+            c.emissiveIntensity = isBreached ? 0.9 : isActive ? 0.55 : 0.2;
           }
-          return cloned;
+          return c;
         });
-        if (!Array.isArray(obj.material)) obj.material = obj.material[0];
+        obj.material = Array.isArray(obj.material) ? cloned : cloned[0];
       }
     });
-    return () => { touched.forEach((m) => m.dispose?.()); };
+    return () => touched.forEach((m) => m.dispose?.());
   }, [sceneClone, isActive, isBreached]);
 
-  return <primitive object={sceneClone} />;
+  // Push debug info up the tree once everything is computed.
+  useEffect(() => {
+    onDebug?.({
+      loaded: true,
+      path,
+      displayName,
+      size,
+      scaleFactor,
+    });
+  }, [onDebug, path, displayName, size, scaleFactor]);
+
+  return (
+    <group position={offset} scale={scaleFactor} rotation={rotation}>
+      <primitive object={sceneClone} />
+    </group>
+  );
+}
+
+// ── Bounding-box helper rendered only in Asset Debug mode ──────────────────
+function DebugBoundingBox({ size, color = '#00ff7f' }) {
+  if (!size || size[1] <= 0) return null;
+  return (
+    <mesh position={[0, size[1] / 2, 0]}>
+      <boxGeometry args={size} />
+      <meshBasicMaterial color={color} wireframe transparent opacity={0.45} />
+    </mesh>
+  );
 }
 
 // ── Public component ────────────────────────────────────────────────────────
@@ -505,54 +560,85 @@ export default function ModelAsset({
   tint = '#00d4ff',
   position = [0, 0, 0],
   rotation,
-  scale,
+  scale,                                             // optional extra multiplier
   isActive = false,
   isBreached = false,
   isProtected = false,
+  debug = false,                                      // Asset Debug toggle
+  onDebugInfo,                                        // optional (info) => void
   onPointerOver,
   onPointerOut,
   onClick,
 }) {
   const groupRef = useRef();
   const entry = getModelEntry(modelKey);
-  const finalScale = scale ?? entry?.scale ?? 1;
-  const finalRotation = rotation ?? entry?.rotation ?? [0, 0, 0];
-  const finalPosition = position ?? entry?.position ?? [0, 0, 0];
   const fallbackKind = fallback || entry?.fallback || 'box';
   const path = entry?.path;
 
-  // Subtle idle pulse on active/breached/protected state
+  const finalRotation = rotation ?? entry?.rotation ?? [0, 0, 0];
+  const finalPosition = useMemo(() => {
+    const off = entry?.positionOffset ?? [0, 0, 0];
+    return [position[0] + off[0], position[1] + off[1], position[2] + off[2]];
+  }, [position, entry?.positionOffset]);
+  const desiredHeight = entry?.desiredHeight ?? 1.0;
+  const scaleMul = (scale ?? 1) * (entry?.scale ?? 1);
+
+  // local cache of latest debug info – exposed via DebugBoundingBox below
+  const debugRef = useRef({ loaded: false, path, displayName: entry?.displayName, size: null, scaleFactor: null });
+
+  const handleDebug = (info) => {
+    debugRef.current = { ...debugRef.current, ...info };
+    onDebugInfo?.(debugRef.current);
+  };
+
+  // Subtle idle pulse on the OUTER group (does not affect normalised size).
   useFrame(({ clock }) => {
     if (!groupRef.current) return;
     const t = clock.getElapsedTime();
     if (isActive || isBreached || isProtected) {
       const speed = isBreached ? 9 : isActive ? 4 : 2;
-      const amp = isBreached ? 0.05 : isActive ? 0.04 : 0.025;
-      groupRef.current.scale.setScalar(finalScale * (1 + Math.sin(t * speed) * amp));
-    } else if (groupRef.current.scale.x !== finalScale) {
-      groupRef.current.scale.setScalar(finalScale);
+      const amp   = isBreached ? 0.05 : isActive ? 0.04 : 0.025;
+      groupRef.current.scale.setScalar(1 + Math.sin(t * speed) * amp);
+    } else if (groupRef.current.scale.x !== 1) {
+      groupRef.current.scale.setScalar(1);
     }
   });
 
-  const fallbackElement = <Fallback kind={fallbackKind} tint={tint} />;
+  const fallbackEl = <Fallback kind={fallbackKind} tint={tint} />;
 
   return (
     <group
       ref={groupRef}
       position={finalPosition}
-      rotation={finalRotation}
-      scale={finalScale}
       onPointerOver={onPointerOver ? (e) => { e.stopPropagation(); onPointerOver(e); } : undefined}
       onPointerOut={onPointerOut}
       onClick={onClick ? (e) => { e.stopPropagation(); onClick(e); } : undefined}
     >
-      <GltfErrorBoundary fallback={fallbackElement}>
-        <Suspense fallback={fallbackElement}>
+      <GltfErrorBoundary
+        label={entry?.displayName || modelKey}
+        fallback={fallbackEl}
+        onFail={() => handleDebug({ loaded: false, path })}
+      >
+        <Suspense fallback={fallbackEl}>
           {path
-            ? <GltfModel path={path} isActive={isActive} isBreached={isBreached} />
-            : fallbackElement}
+            ? <GltfModel
+                path={path}
+                displayName={entry?.displayName}
+                desiredHeight={desiredHeight}
+                scaleMul={scaleMul}
+                rotation={finalRotation}
+                isActive={isActive}
+                isBreached={isBreached}
+                onDebug={handleDebug}
+              />
+            : fallbackEl}
         </Suspense>
       </GltfErrorBoundary>
+
+      {/* Asset Debug overlay — bounding box (only when both debug + size known) */}
+      {debug && debugRef.current?.size && (
+        <DebugBoundingBox size={debugRef.current.size} />
+      )}
     </group>
   );
 }

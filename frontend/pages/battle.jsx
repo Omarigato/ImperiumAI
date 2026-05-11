@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play, RotateCcw, Shield, RefreshCcw, Skull, Activity, Zap, Cpu,
   Maximize2, Minimize2, Tag, Eye, EyeOff, Crosshair, Grid3X3, X,
+  Home, Bug,
 } from 'lucide-react';
 import NavBar from '../components/NavBar';
 import RiskMeter from '../components/RiskMeter';
@@ -79,6 +80,12 @@ export default function BattlePage() {
   const [showDebugGrid, setShowDebugGrid] = useState(false);
   // environment: 'none' | 'cyber_city' | 'dystopian_city' — only ONE at a time
   const [environment, setEnvironment] = useState('none');
+  // layout: 'exploded' (default — every GLB visible) | 'house-mounted' (compact)
+  const [layout, setLayout] = useState('exploded');
+  // External house.glb instead of the procedural holographic house
+  const [useExternalHouse, setUseExternalHouse] = useState(false);
+  // Asset Debug — bounding boxes + always-on labels for every model
+  const [assetDebug, setAssetDebug] = useState(false);
 
   // ── hover / selection / tooltip ──────────────────────────────────────────
   const [hovered, setHovered] = useState(null);                  // { id, kind, x, y }
@@ -324,11 +331,15 @@ export default function BattlePage() {
     riskScore,
     performanceMode,
     enablePostprocessing: true,
-    showLabels,
+    // Asset Debug also forces all labels on so you can identify each model.
+    showLabels: showLabels || assetDebug,
     showAttackBeams,
     showStatusIcons,
     showDebugGrid,
     environment,
+    layout,
+    useExternalHouse,
+    assetDebug,
     hoveredObjectId: hovered?.id || null,
     selectedObjectId: selected?.id || null,
     onHover: handleHover,
@@ -336,8 +347,8 @@ export default function BattlePage() {
   }), [
     deviceStates, activeAttack, defendedTargets, activeAgent, agentStatuses,
     shieldActive, riskScore, performanceMode, showLabels, showAttackBeams,
-    showStatusIcons, showDebugGrid, environment, hovered?.id, selected?.id,
-    handleHover, handleSelect,
+    showStatusIcons, showDebugGrid, environment, layout, useExternalHouse,
+    assetDebug, hovered?.id, selected?.id, handleHover, handleSelect,
   ]);
 
   const hoveredDeviceState = hovered?.kind === 'device' ? deviceStates[hovered.id] : null;
@@ -396,30 +407,44 @@ export default function BattlePage() {
             <SceneToggle on={showStatusIcons} onClick={() => setShowStatusIcons((v) => !v)} iconOn={Eye}        iconOff={EyeOff}     title="Show status icons">Icons</SceneToggle>
             <SceneToggle on={showDebugGrid}   onClick={() => setShowDebugGrid((v) => !v)}   iconOn={Grid3X3}    iconOff={Grid3X3}    title="Show debug grid">Grid</SceneToggle>
 
+            {/* Layout selector — exploded (default) | house-mounted */}
+            <SelectChip
+              label="LAYOUT"
+              value={layout}
+              onChange={setLayout}
+              options={[
+                ['exploded',      'exploded'],
+                ['house-mounted', 'house'],
+              ]}
+              title="exploded: every GLB visible · house-mounted: legacy compact layout"
+            />
+
+            {/* External house.glb (27 MB) vs procedural holographic house */}
+            <SceneToggle on={useExternalHouse} onClick={() => setUseExternalHouse((v) => !v)}
+              iconOn={Home} iconOff={Home}
+              title="Render house.glb (~27 MB) instead of the procedural holographic house">
+              House{useExternalHouse ? '·glb' : '·holo'}
+            </SceneToggle>
+
+            {/* Asset Debug — bounding boxes + labels for every model */}
+            <SceneToggle on={assetDebug} onClick={() => setAssetDebug((v) => !v)}
+              iconOn={Bug} iconOff={Bug}
+              title="Asset Debug: bounding boxes + permanent labels + loaded/fallback path">
+              Debug
+            </SceneToggle>
+
             {/* Environment selector — only ONE heavy backdrop at a time */}
-            <label style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '3px 6px', fontSize: 10, fontWeight: 600,
-              color: 'var(--wv-text-2, #aab)',
-              border: '1px solid var(--wv-border, #2b3140)',
-              borderRadius: 6, flex: '0 0 auto',
-            }} title="Swap heavy background. Only ONE can be active (22–29 MB each).">
-              ENV
-              <select
-                value={environment}
-                onChange={(e) => setEnvironment(e.target.value)}
-                className="wv-mono"
-                style={{
-                  background: 'transparent', color: 'var(--wv-cyan, #00d4ff)',
-                  border: 'none', outline: 'none', fontSize: 10, fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                <option value="none">none</option>
-                <option value="cyber_city">cyber_city</option>
-                <option value="dystopian_city">dystopian_city</option>
-              </select>
-            </label>
+            <SelectChip
+              label="ENV"
+              value={environment}
+              onChange={setEnvironment}
+              options={[
+                ['none',           'none'],
+                ['cyber_city',     'cyber_city'],
+                ['dystopian_city', 'dystopian_city'],
+              ]}
+              title="Heavy background. Only ONE can be active (22–30 MB each)."
+            />
 
             <span className="wv-badge" style={{ flex: '0 0 auto' }}>
               R <span className="wv-mono" style={{ color: 'var(--wv-cyan)', marginLeft: 4 }}>{round}</span>
@@ -678,6 +703,38 @@ function ToggleButton({ on, onClick, icon: Icon, title, children }) {
       title={title} style={{ flex: '0 0 auto' }}>
       <Icon size={13} /> {children}
     </button>
+  );
+}
+
+function SelectChip({ label, value, onChange, options, title }) {
+  return (
+    <label
+      title={title}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '3px 6px', fontSize: 10, fontWeight: 600,
+        color: 'var(--wv-text-2, #aab)',
+        border: '1px solid var(--wv-border, #2b3140)',
+        borderRadius: 6, flex: '0 0 auto',
+      }}
+    >
+      {label}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="wv-mono"
+        style={{
+          background: 'transparent',
+          color: 'var(--wv-cyan, #00d4ff)',
+          border: 'none', outline: 'none',
+          fontSize: 10, fontWeight: 700, cursor: 'pointer',
+        }}
+      >
+        {options.map(([val, lbl]) => (
+          <option key={val} value={val}>{lbl}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 

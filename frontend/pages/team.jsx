@@ -7,7 +7,7 @@ import NavBar from '../components/NavBar';
 const TEAM_MEMBERS = [
   {
     id: 1,
-    name: 'Аким Омар Айді',
+    name: 'Аким Омар',
     nameEn: 'Akim Omar Aidi',
     role: 'Project Lead & Full-Stack Developer',
     studentId: '34732',
