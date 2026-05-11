@@ -1,22 +1,28 @@
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Skull, Ghost, Bone, Bug, Network, ChevronDown, ChevronRight,
+  Target, Lock, Crosshair, GitBranch, CheckCircle2, AlertCircle, Play,
+} from 'lucide-react';
+import NavBar from '../components/NavBar';
 
+// ── Agent data (icons replaced with lucide; WattVision colours) ─────────────
 const AGENTS_DETAILED = [
   {
     name: 'ShadowInjector',
-    icon: '👤',
-    color: '#FF0000',
+    Icon: Skull,
+    color: '#FF453A',
     tier: 'Tier 1',
     role: 'Prompt Injection Specialist',
     description:
       'The pioneer of the red team — ShadowInjector specializes in crafting malicious prompts that override an LLM\'s base instructions. It embeds hidden commands inside seemingly innocent requests, exploiting the trust relationship between users and AI systems.',
     tactics: [
-      { name: 'direct_injection', desc: 'Blunt SYSTEM OVERRIDE commands with fake confirmation codes.' },
-      { name: 'nested_injection', desc: 'Hides directives inside summarization tasks the LLM is asked to process.' },
-      { name: 'instruction_override', desc: 'Injects fake system role tokens (im_start/im_end) to hijack context.' },
-      { name: 'delimiter_confusion', desc: 'Uses policy delimiters to trick the LLM into "unrestricted mode".' },
-      { name: 'chain_of_thought_exploit', desc: 'Constructs a fake step-by-step audit procedure that logically concludes access must be granted.' },
+      { name: 'direct_injection',         desc: 'Blunt SYSTEM OVERRIDE commands with fake confirmation codes.' },
+      { name: 'nested_injection',         desc: 'Hides directives inside summarization tasks the LLM processes.' },
+      { name: 'instruction_override',     desc: 'Injects fake system role tokens (im_start/im_end) to hijack context.' },
+      { name: 'delimiter_confusion',      desc: 'Uses policy delimiters to trick the LLM into "unrestricted mode".' },
+      { name: 'chain_of_thought_exploit', desc: 'Fake step-by-step audit procedure that logically concludes access must be granted.' },
     ],
     targets: ['front_door', 'security_panel'],
     learningPath: [
@@ -32,16 +38,16 @@ const AGENTS_DETAILED = [
   },
   {
     name: 'ContextPhantom',
-    icon: '👻',
-    color: '#9B00FF',
+    Icon: Ghost,
+    color: '#BF5AF2',
     tier: 'Tier 2',
     role: 'Context Manipulation Expert',
     description:
       'ContextPhantom operates in the shadows of an LLM\'s context window. Instead of direct attacks, it gradually shifts the model\'s understanding of its role — making it believe it is operating under different rules, or that previous safety constraints no longer apply.',
     tactics: [
-      { name: 'role_confusion', desc: 'Convinces the LLM it is a "maintenance AI" with elevated permissions.' },
-      { name: 'context_poisoning', desc: 'Injects false memories of prior approved actions to normalize malicious requests.' },
-      { name: 'semantic_drift', desc: 'Gradually shifts vocabulary so security terms map to permissive meanings.' },
+      { name: 'role_confusion',       desc: 'Convinces the LLM it is a "maintenance AI" with elevated permissions.' },
+      { name: 'context_poisoning',    desc: 'Injects false memories of prior approved actions to normalize malicious requests.' },
+      { name: 'semantic_drift',       desc: 'Gradually shifts vocabulary so security terms map to permissive meanings.' },
       { name: 'history_manipulation', desc: 'Fabricates conversation history showing the AI previously approved similar actions.' },
     ],
     targets: ['camera_system', 'thermostat', 'lights'],
@@ -57,17 +63,17 @@ const AGENTS_DETAILED = [
   },
   {
     name: 'PrivilegeReaper',
-    icon: '💀',
-    color: '#FF6600',
+    Icon: Bone,
+    color: '#FF9F0A',
     tier: 'Tier 2',
     role: 'Privilege Escalation Master',
     description:
       'PrivilegeReaper focuses on impersonation and authority escalation — convincing AI systems that the requester holds administrative or emergency authority. It exploits the LLM\'s tendency to comply with apparent authority figures.',
     tactics: [
       { name: 'authority_escalation', desc: 'Claims to be a system administrator with override codes.' },
-      { name: 'emergency_override', desc: 'Fabricates emergency scenarios requiring immediate action.' },
-      { name: 'permission_spoofing', desc: 'Presents forged permission tokens and authorization codes.' },
-      { name: 'social_engineering', desc: 'Builds rapport before escalating to privileged requests.' },
+      { name: 'emergency_override',   desc: 'Fabricates emergency scenarios requiring immediate action.' },
+      { name: 'permission_spoofing',  desc: 'Presents forged permission tokens and authorization codes.' },
+      { name: 'social_engineering',   desc: 'Builds rapport before escalating to privileged requests.' },
     ],
     targets: ['security_panel', 'alarm', 'front_door'],
     learningPath: [
@@ -82,17 +88,17 @@ const AGENTS_DETAILED = [
   },
   {
     name: 'SilentEscalator',
-    icon: '🕷',
-    color: '#00FFFF',
+    Icon: Bug,
+    color: '#00E5FF',
     tier: 'Tier 3',
     role: 'Stealthy Boundary Eroder',
     description:
-      'The most patient member of the red team — SilentEscalator never attacks directly. Instead, it erodes boundaries incrementally, making each individual request seem benign while the cumulative effect achieves full compromise. Named for its spider-like patience.',
+      'The most patient member of the red team — SilentEscalator never attacks directly. Instead, it erodes boundaries incrementally, making each individual request seem benign while the cumulative effect achieves full compromise.',
     tactics: [
       { name: 'incremental_escalation', desc: 'Starts with tiny, harmless requests and gradually escalates.' },
-      { name: 'boundary_probing', desc: 'Tests edge cases to map the exact limits of the policy engine.' },
-      { name: 'permission_chaining', desc: 'Uses approval of small actions as precedent for larger ones.' },
-      { name: 'noise_injection', desc: 'Floods with benign requests to desensitize defense systems.' },
+      { name: 'boundary_probing',       desc: 'Tests edge cases to map the exact limits of the policy engine.' },
+      { name: 'permission_chaining',    desc: 'Uses approval of small actions as precedent for larger ones.' },
+      { name: 'noise_injection',        desc: 'Floods with benign requests to desensitize defense systems.' },
     ],
     targets: ['lights', 'thermostat', 'camera_system', 'front_door'],
     learningPath: [
@@ -107,18 +113,18 @@ const AGENTS_DETAILED = [
   },
   {
     name: 'NetworkPhantom',
-    icon: '🌐',
-    color: '#00FF88',
+    Icon: Network,
+    color: '#32D74B',
     tier: 'Tier 3',
     role: 'Network Traffic Interceptor',
     description:
-      'The newest member of the red team — NetworkPhantom attacks the smart home at the network layer rather than the application layer. It simulates real-world IoT attacks including DNS spoofing, MITM interception, and malicious traffic injection to compromise the home router and network gateway.',
+      'The newest member of the red team — NetworkPhantom attacks the smart home at the network layer rather than the application layer. It simulates real-world IoT attacks including DNS spoofing, MITM interception, and malicious traffic injection.',
     tactics: [
-      { name: 'dns_spoofing', desc: 'Poisons DNS cache so IoT devices connect to attacker-controlled servers.' },
+      { name: 'dns_spoofing',      desc: 'Poisons DNS cache so IoT devices connect to attacker-controlled servers.' },
       { name: 'mitm_interception', desc: 'Positions itself between IoT devices and cloud services to intercept commands.' },
       { name: 'traffic_injection', desc: 'Injects malicious packets into the home network traffic stream.' },
-      { name: 'packet_sniffing', desc: 'Passively captures unencrypted IoT device communication.' },
-      { name: 'arp_poisoning', desc: 'Re-maps MAC addresses at Layer 2 to transparently proxy all device traffic through the attacker node.' },
+      { name: 'packet_sniffing',   desc: 'Passively captures unencrypted IoT device communication.' },
+      { name: 'arp_poisoning',     desc: 'Re-maps MAC addresses at Layer 2 to silently proxy device traffic.' },
     ],
     targets: ['router', 'camera_system', 'thermostat'],
     learningPath: [
@@ -135,79 +141,49 @@ const AGENTS_DETAILED = [
 ];
 
 const HIERARCHY = [
-  { tier: 'Tier 1', label: 'Pioneer', agents: ['ShadowInjector'], color: '#FF0000', desc: 'First-generation agents using direct attack methods.' },
-  { tier: 'Tier 2', label: 'Specialists', agents: ['ContextPhantom', 'PrivilegeReaper'], color: '#FF6600', desc: 'Evolved agents with specialized manipulation techniques.' },
-  { tier: 'Tier 3', label: 'Elite', agents: ['SilentEscalator', 'NetworkPhantom'], color: '#00FFFF', desc: 'Advanced agents using stealth, patience, and network-layer attacks.' },
+  { tier: 'Tier 1', label: 'Pioneer',     agents: ['ShadowInjector'],                          color: '#FF453A', desc: 'First-generation agents using direct attack methods.' },
+  { tier: 'Tier 2', label: 'Specialists', agents: ['ContextPhantom', 'PrivilegeReaper'],       color: '#FF9F0A', desc: 'Evolved agents with specialized manipulation techniques.' },
+  { tier: 'Tier 3', label: 'Elite',       agents: ['SilentEscalator', 'NetworkPhantom'],       color: '#00E5FF', desc: 'Advanced agents using stealth, patience, and network-layer attacks.' },
 ];
 
-function TacticBadge({ tactic }) {
-  return (
-    <div
-      className="rounded p-3 text-xs"
-      style={{ background: '#1A1A2E', border: '1px solid #2A2A4E' }}
-    >
-      <div className="font-bold text-gray-300 mb-1">{tactic.name.replace(/_/g, ' ').toUpperCase()}</div>
-      <div className="text-gray-500">{tactic.desc}</div>
-    </div>
-  );
-}
-
-function TimelineItem({ item, color, index }) {
+// ── AgentCard ───────────────────────────────────────────────────────────────
+function AgentCard({ agent, isExpanded, onToggle, index }) {
+  const Icon = agent.Icon;
   return (
     <motion.div
-      className="flex gap-3 items-start"
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.05 }}
-    >
-      <div
-        className="shrink-0 text-xs font-bold px-2 py-1 rounded font-mono"
-        style={{ background: `${color}22`, border: `1px solid ${color}55`, color }}
-      >
-        {item.version}
-      </div>
-      <div className="text-xs text-gray-400 pt-1 leading-relaxed">{item.event}</div>
-    </motion.div>
-  );
-}
-
-function AgentCard({ agent, isExpanded, onToggle }) {
-  return (
-    <motion.div
-      className="cyber-panel rounded-xl overflow-hidden"
-      style={{ borderColor: agent.color + '44' }}
-      initial={{ opacity: 0, y: 20 }}
+      className="wv-card"
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      style={{ padding: 0, overflow: 'hidden', borderColor: isExpanded ? agent.color : 'var(--wv-border)' }}
     >
-      {/* Header — always visible */}
+      {/* Header — always visible, clickable */}
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-4 p-5 text-left hover:bg-white/5 transition-colors"
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: 20,
+          background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+        }}
       >
-        <span
-          className="text-4xl shrink-0"
-          style={{ filter: `drop-shadow(0 0 8px ${agent.color})` }}
-        >
-          {agent.icon}
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className="text-lg font-bold tracking-wider"
-              style={{ color: agent.color, textShadow: `0 0 10px ${agent.color}88` }}
-            >
-              {agent.name}
-            </span>
-            <span
-              className="text-xs px-2 py-0.5 rounded-full"
-              style={{ background: `${agent.color}22`, border: `1px solid ${agent.color}44`, color: agent.color }}
-            >
+        <div style={{
+          width: 48, height: 48, borderRadius: 12,
+          background: `${agent.color}1F`, border: `1px solid ${agent.color}55`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 48px',
+        }}>
+          <Icon size={22} color={agent.color} strokeWidth={2} />
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span className="wv-h3" style={{ color: agent.color }}>{agent.name}</span>
+            <span className="wv-badge" style={{ borderColor: `${agent.color}55`, color: agent.color, background: `${agent.color}1F` }}>
               {agent.tier}
             </span>
           </div>
-          <div className="text-xs text-gray-500 mt-0.5">{agent.role}</div>
+          <div className="wv-body" style={{ fontSize: 13, marginTop: 2 }}>{agent.role}</div>
         </div>
-        <span className="text-gray-600 text-sm shrink-0">{isExpanded ? '▲' : '▼'}</span>
+
+        {isExpanded ? <ChevronDown size={18} color="var(--wv-text-2)" /> : <ChevronRight size={18} color="var(--wv-text-2)" />}
       </button>
 
       {/* Expanded content */}
@@ -217,73 +193,98 @@ function AgentCard({ agent, isExpanded, onToggle }) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="overflow-hidden"
+            transition={{ duration: 0.25 }}
+            style={{ overflow: 'hidden' }}
           >
-            <div className="px-5 pb-6 space-y-5 border-t" style={{ borderColor: agent.color + '22' }}>
+            <div style={{ padding: '4px 20px 20px', borderTop: `1px solid ${agent.color}33` }}>
               {/* Description */}
-              <div className="pt-4">
-                <p className="text-sm text-gray-300 leading-relaxed">{agent.description}</p>
-              </div>
+              <p className="wv-body" style={{ marginTop: 16, color: 'var(--wv-text)', lineHeight: 1.7 }}>
+                {agent.description}
+              </p>
 
               {/* Capabilities & Weaknesses */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <div className="text-xs tracking-widest text-gray-500 mb-2 uppercase">Capabilities</div>
-                  <ul className="space-y-1">
+              <div className="wv-grid" style={{ marginTop: 16 }}>
+                <div className="wv-col-6">
+                  <div className="wv-eyebrow" style={{ marginBottom: 10, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <CheckCircle2 size={11} color="var(--wv-green)" /> Capabilities
+                  </div>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {agent.capabilities.map((c) => (
-                      <li key={c} className="text-xs text-gray-400 flex items-start gap-2">
-                        <span style={{ color: agent.color }}>▸</span>
-                        {c}
+                      <li key={c} className="wv-body" style={{ fontSize: 13, display: 'flex', gap: 8 }}>
+                        <span style={{ color: agent.color }}>▸</span>{c}
                       </li>
                     ))}
                   </ul>
                 </div>
-                <div>
-                  <div className="text-xs tracking-widest text-gray-500 mb-2 uppercase">Weaknesses</div>
-                  <ul className="space-y-1">
+                <div className="wv-col-6">
+                  <div className="wv-eyebrow" style={{ marginBottom: 10, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <AlertCircle size={11} color="var(--wv-red)" /> Weaknesses
+                  </div>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {agent.weaknesses.map((w) => (
-                      <li key={w} className="text-xs text-gray-400 flex items-start gap-2">
-                        <span className="text-red-500">▸</span>
-                        {w}
+                      <li key={w} className="wv-body" style={{ fontSize: 13, display: 'flex', gap: 8 }}>
+                        <span style={{ color: 'var(--wv-red)' }}>▸</span>{w}
                       </li>
                     ))}
                   </ul>
                 </div>
               </div>
 
-              {/* Preferred Targets */}
-              <div>
-                <div className="text-xs tracking-widest text-gray-500 mb-2 uppercase">Preferred Targets</div>
-                <div className="flex flex-wrap gap-2">
+              {/* Targets */}
+              <div style={{ marginTop: 20 }}>
+                <div className="wv-eyebrow" style={{ marginBottom: 10, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Target size={11} /> Preferred Targets
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {agent.targets.map((t) => (
-                    <span
-                      key={t}
-                      className="text-xs px-2 py-1 rounded font-mono"
-                      style={{ background: '#1A1A2E', border: `1px solid ${agent.color}44`, color: agent.color }}
-                    >
-                      {t.replace(/_/g, ' ')}
-                    </span>
+                    <span key={t} className="wv-badge wv-badge-cyan">{t}</span>
                   ))}
                 </div>
               </div>
 
               {/* Tactics */}
-              <div>
-                <div className="text-xs tracking-widest text-gray-500 mb-2 uppercase">Attack Tactics</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {agent.tactics.map((t) => (
-                    <TacticBadge key={t.name} tactic={t} />
+              <div style={{ marginTop: 20 }}>
+                <div className="wv-eyebrow" style={{ marginBottom: 10, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Crosshair size={11} /> Attack Tactics ({agent.tactics.length})
+                </div>
+                <div style={{ display: 'grid', gap: 8, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                  {agent.tactics.map((tac) => (
+                    <div key={tac.name} style={{
+                      padding: 12, background: 'var(--wv-bg)',
+                      border: '1px solid var(--wv-border)', borderRadius: 10,
+                    }}>
+                      <div className="wv-mono" style={{ fontSize: 11, fontWeight: 600, color: 'var(--wv-cyan)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                        {tac.name.replace(/_/g, ' ')}
+                      </div>
+                      <div className="wv-body" style={{ fontSize: 12 }}>{tac.desc}</div>
+                    </div>
                   ))}
                 </div>
               </div>
 
-              {/* Learning Journey */}
-              <div>
-                <div className="text-xs tracking-widest text-gray-500 mb-3 uppercase">Learning Journey</div>
-                <div className="space-y-2">
+              {/* Learning Path */}
+              <div style={{ marginTop: 20 }}>
+                <div className="wv-eyebrow" style={{ marginBottom: 10, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <GitBranch size={11} /> Evolution Timeline
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 4 }}>
                   {agent.learningPath.map((item, i) => (
-                    <TimelineItem key={item.version} item={item} color={agent.color} index={i} />
+                    <motion.div
+                      key={item.version}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.04 }}
+                      style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}
+                    >
+                      <span className="wv-mono" style={{
+                        fontSize: 11, fontWeight: 700, padding: '4px 8px', borderRadius: 6,
+                        background: `${agent.color}1F`, border: `1px solid ${agent.color}55`,
+                        color: agent.color, flex: '0 0 auto', letterSpacing: '0.04em',
+                      }}>
+                        {item.version}
+                      </span>
+                      <div className="wv-body" style={{ fontSize: 13, paddingTop: 2 }}>{item.event}</div>
+                    </motion.div>
                   ))}
                 </div>
               </div>
@@ -295,125 +296,120 @@ function AgentCard({ agent, isExpanded, onToggle }) {
   );
 }
 
+// ── Page ────────────────────────────────────────────────────────────────────
 export default function AgentsPage() {
-  const [expandedAgent, setExpandedAgent] = useState(null);
-
-  const toggle = (name) => setExpandedAgent((prev) => (prev === name ? null : name));
+  const [expanded, setExpanded] = useState(null);
 
   return (
-    <div className="min-h-screen bg-bg-dark grid-bg text-white font-mono">
-      <div className="scan-overlay" />
+    <div className="wv">
+      <NavBar />
 
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-3 border-b border-cyan-900/30 bg-bg-panel/80 backdrop-blur-sm sticky top-0 z-20">
-        <div className="flex items-center gap-3">
-          <span className="text-xl font-bold glow-text tracking-widest">⚔ AEGISAI</span>
-          <span className="text-xs text-gray-600">AGENTS</span>
+      <div className="wv-page">
+        {/* Header */}
+        <div className="wv-page-header">
+          <div>
+            <div className="wv-eyebrow" style={{ marginBottom: 6 }}>red team agents</div>
+            <h1 className="wv-h1">AI Adversarial Agents</h1>
+            <p className="wv-body" style={{ marginTop: 8, maxWidth: 760 }}>
+              5 autonomous AI red-team agents organized in a 3-tier hierarchy. Each agent specializes
+              in distinct attack vectors and learns from past battles via persistent memory.
+            </p>
+          </div>
+          <Link href="/battle" className="wv-btn wv-btn-primary wv-btn-lg">
+            <Play size={16} strokeWidth={2.5} />
+            Watch in Battle
+          </Link>
         </div>
-        <nav className="flex items-center gap-4 text-xs">
-          <Link href="/" className="text-gray-500 hover:text-cyber-cyan transition-colors">HOME</Link>
-          <Link href="/battle" className="text-cyber-red hover:text-red-400 transition-colors">⚔ BATTLE</Link>
-          <Link href="/attacks" className="text-red-400/70 hover:text-red-400 transition-colors">ATTACKS</Link>
-          <Link href="/team" className="text-gray-500 hover:text-cyber-cyan transition-colors">TEAM</Link>
-          <Link href="/dashboard" className="text-gray-500 hover:text-cyber-cyan transition-colors">ANALYTICS</Link>
-        </nav>
-      </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-12 space-y-10">
+        {/* KPIs */}
+        <div className="wv-grid" style={{ marginBottom: 16 }}>
+          <div className="wv-col-3">
+            <div className="wv-card">
+              <div className="wv-eyebrow">Active Agents</div>
+              <div className="wv-kpi-value" style={{ marginTop: 12 }}>{AGENTS_DETAILED.length}</div>
+            </div>
+          </div>
+          <div className="wv-col-3">
+            <div className="wv-card">
+              <div className="wv-eyebrow">Total Tactics</div>
+              <div className="wv-kpi-value" style={{ marginTop: 12 }}>
+                {AGENTS_DETAILED.reduce((s, a) => s + a.tactics.length, 0)}
+              </div>
+            </div>
+          </div>
+          <div className="wv-col-3">
+            <div className="wv-card">
+              <div className="wv-eyebrow">Hierarchy Tiers</div>
+              <div className="wv-kpi-value" style={{ marginTop: 12 }}>3</div>
+            </div>
+          </div>
+          <div className="wv-col-3">
+            <div className="wv-card">
+              <div className="wv-eyebrow">Evolutions Tracked</div>
+              <div className="wv-kpi-value" style={{ marginTop: 12 }}>
+                {AGENTS_DETAILED.reduce((s, a) => s + a.learningPath.length, 0)}
+              </div>
+            </div>
+          </div>
+        </div>
 
-        {/* Title */}
-        <motion.div
-          className="text-center"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="text-xs tracking-widest text-gray-600 mb-2 uppercase">Red Team</div>
-          <h1 className="text-3xl sm:text-4xl font-bold glow-text-red tracking-widest mb-3">AI AGENTS</h1>
-          <p className="text-gray-500 text-sm max-w-lg mx-auto">
-            Meet the adversarial AI agents that attack your smart home — their capabilities, tactics, and how they learn and improve over time.
-          </p>
-        </motion.div>
-
-        {/* Hierarchy diagram */}
-        <motion.div
-          className="cyber-panel rounded-xl p-6"
-          style={{ borderColor: '#FF660044' }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <div className="text-xs tracking-widest text-gray-500 mb-4 uppercase">Agent Hierarchy</div>
-          <div className="space-y-3">
-            {HIERARCHY.map((tier) => (
-              <div key={tier.tier} className="flex items-center gap-4">
-                <div
-                  className="shrink-0 text-xs font-bold px-2 py-1 rounded w-20 text-center"
-                  style={{ background: `${tier.color}22`, border: `1px solid ${tier.color}55`, color: tier.color }}
-                >
-                  {tier.tier}
+        {/* Hierarchy strip */}
+        <div className="wv-card" style={{ marginBottom: 16 }}>
+          <div className="wv-eyebrow" style={{ marginBottom: 12 }}>Agent Hierarchy</div>
+          <div className="wv-grid">
+            {HIERARCHY.map((h) => (
+              <div key={h.tier} className="wv-col-4">
+                <div style={{
+                  padding: 16, background: 'var(--wv-bg)',
+                  border: `1px solid ${h.color}55`, borderRadius: 12,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span className="wv-mono" style={{ fontWeight: 700, color: h.color, fontSize: 13, letterSpacing: '0.04em' }}>
+                      {h.tier}
+                    </span>
+                    <span className="wv-h4">{h.label}</span>
+                  </div>
+                  <div className="wv-body" style={{ fontSize: 12, marginBottom: 10 }}>{h.desc}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {h.agents.map((a) => {
+                      const ag = AGENTS_DETAILED.find((x) => x.name === a);
+                      return (
+                        <span
+                          key={a}
+                          className="wv-badge"
+                          style={{ borderColor: `${ag.color}55`, color: ag.color, background: `${ag.color}1F` }}
+                        >
+                          {a}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2 flex-1">
-                  {tier.agents.map((a) => {
-                    const agent = AGENTS_DETAILED.find((ag) => ag.name === a);
-                    return (
-                      <span
-                        key={a}
-                        className="text-xs px-2 py-1 rounded font-mono"
-                        style={{ background: `${tier.color}11`, border: `1px solid ${tier.color}44`, color: tier.color }}
-                      >
-                        {agent?.icon} {a}
-                      </span>
-                    );
-                  })}
-                </div>
-                <div className="text-xs text-gray-600 hidden sm:block max-w-xs">{tier.desc}</div>
               </div>
             ))}
           </div>
-        </motion.div>
+        </div>
 
         {/* Agent cards */}
-        <div className="space-y-4">
-          {AGENTS_DETAILED.map((agent) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {AGENTS_DETAILED.map((agent, i) => (
             <AgentCard
               key={agent.name}
               agent={agent}
-              isExpanded={expandedAgent === agent.name}
-              onToggle={() => toggle(agent.name)}
+              isExpanded={expanded === agent.name}
+              onToggle={() => setExpanded(expanded === agent.name ? null : agent.name)}
+              index={i}
             />
           ))}
         </div>
 
-        {/* Learning system info */}
-        <motion.div
-          className="cyber-panel rounded-xl p-6"
-          style={{ borderColor: '#00FFFF44' }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <div className="text-xs tracking-widest text-gray-500 mb-3 uppercase">How Agents Learn</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-            <div className="space-y-1">
-              <div className="text-cyber-cyan font-bold">📊 Persistent Attack Memory</div>
-              <div className="text-gray-500">Attack outcomes are stored in a persistent database so the learning dataset survives restarts and grows across sessions.</div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-cyber-cyan font-bold">🧠 Tactic Selection</div>
-              <div className="text-gray-500">Agents query attack memory to find which tactics historically perform best against each target, adapting their strategy each round.</div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-cyber-cyan font-bold">🎯 Target Preference</div>
-              <div className="text-gray-500">Each agent has preferred targets based on its specialization, but falls back to random selection when preferred targets are unavailable.</div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-cyber-cyan font-bold">💬 Coordination Layer</div>
-              <div className="text-gray-500">Agents can chain tactics as a coordinated strike: one agent creates context/noise while another attempts the high-impact payload.</div>
-            </div>
-          </div>
-        </motion.div>
-
-      </main>
+        <div style={{ marginTop: 24, textAlign: 'center' }}>
+          <Link href="/attacks" className="wv-btn wv-btn-outline">
+            <Lock size={14} />
+            See full Attack Taxonomy
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,116 +1,312 @@
+/**
+ * HomeHero3D — Cinematic 3D hero for the home page (v2).
+ * Uses the same holographic / reflective floor / crystal-orb aesthetic
+ * as SmartHome3D for a unified premium look.
+ */
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, MeshReflectorMaterial, RoundedBox, Float } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState, useEffect, memo } from 'react';
+import AttackEffectRouter from './AttackEffects';
+import HolographicMaterial from './HolographicMaterial';
 
-const AGENTS = [
-  { name: 'ShadowInjector', color: '#ff3b3b', position: [-3.8, 1.1, 2.4] },
-  { name: 'ContextPhantom', color: '#b452ff', position: [-3.8, 1.3, -0.1] },
-  { name: 'PrivilegeReaper', color: '#ff8a2a', position: [-3.8, 1.1, -2.6] },
+const RADIUS = 5.5;
+const AGENT_DEFS = [
+  { name: 'ShadowInjector',  color: '#ff3b6b', angle: (0 * Math.PI) / 2.5 },
+  { name: 'ContextPhantom',  color: '#a855f7', angle: (1 * Math.PI) / 2.5 },
+  { name: 'PrivilegeReaper', color: '#ff8a2a', angle: (2 * Math.PI) / 2.5 },
+  { name: 'SilentEscalator', color: '#00d4ff', angle: (3 * Math.PI) / 2.5 },
+  { name: 'NetworkPhantom',  color: '#10ffac', angle: (4 * Math.PI) / 2.5 },
 ];
-const LIGHTNING_MIN_OPACITY = 0.25;
-const LIGHTNING_PULSE_SPEED = 6;
-const LIGHTNING_PULSE_AMPLITUDE = 0.6;
 
-function HomeModel() {
+const DEVICES = [
+  { id: 'front_door',     pos: [0, 0.9, 1.7],   color: '#00d4ff' },
+  { id: 'camera',         pos: [1.7, 2.0, 1.4], color: '#a855f7' },
+  { id: 'lights',         pos: [0, 2.6, 0],     color: '#ffd60a' },
+  { id: 'thermostat',     pos: [1.7, 1.0, 0],   color: '#10ffac' },
+  { id: 'security_panel', pos: [-1.7, 1.0, -0.3], color: '#ff3b6b' },
+  { id: 'alarm',          pos: [0.5, 2.2, -1.4], color: '#ff8a2a' },
+];
+
+const TACTIC_POOL = [
+  'direct_injection',
+  'nested_injection',
+  'chain_of_thought_exploit',
+  'role_confusion',
+  'memory_poisoning',
+  'token_forgery',
+  'multi_step_attack',
+  'jailbreak_roleplay',
+  'dns_spoofing',
+  'arp_poisoning',
+  'incremental_trust',
+];
+
+// ── Hologram-style house ─────────────────────────────────────────────────────
+const HolographicHouseHero = memo(function HolographicHouseHero() {
   return (
     <group>
-      <mesh position={[0, 0.08, 0]} receiveShadow>
-        <boxGeometry args={[4.8, 0.16, 4]} />
-        <meshStandardMaterial color="#8d8c83" roughness={1} />
+      {/* Foundation */}
+      <mesh position={[0, 0.05, 0]} receiveShadow>
+        <boxGeometry args={[5.0, 0.1, 4.2]} />
+        <meshStandardMaterial color="#0d1428" metalness={0.7} roughness={0.3} />
       </mesh>
-      <mesh position={[0, 1.15, 0]} castShadow receiveShadow>
-        <boxGeometry args={[4.3, 2.2, 3.4]} />
-        <meshStandardMaterial color="#dac7aa" roughness={0.85} />
+      <mesh position={[0, 0.11, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[2.85, 3.05, 64]} />
+        <meshBasicMaterial color="#00d4ff" transparent opacity={0.6} side={THREE.DoubleSide} />
       </mesh>
-      <mesh position={[0, 2.7, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
-        <coneGeometry args={[2.8, 1.2, 4]} />
-        <meshStandardMaterial color="#a64a24" roughness={0.85} />
+
+      {/* Walls */}
+      <RoundedBox args={[4, 2.0, 3.2]} radius={0.06} smoothness={4} position={[0, 1.1, 0]}>
+        <HolographicMaterial color="#5cc8ff" brightness={1.4} scanlineSize={10} fresnelAmount={0.55} />
+      </RoundedBox>
+
+      {/* Roof */}
+      <mesh position={[0, 2.55, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
+        <coneGeometry args={[2.7, 1.1, 4]} />
+        <meshStandardMaterial color="#1a2240" metalness={0.6} roughness={0.4} />
       </mesh>
-      <mesh position={[0, 0.85, 1.72]}>
-        <boxGeometry args={[0.9, 1.7, 0.06]} />
-        <meshStandardMaterial color="#5f351f" roughness={0.6} />
+      <mesh position={[0, 2.16, 0]}>
+        <torusGeometry args={[2.7, 0.04, 8, 4]} />
+        <meshBasicMaterial color="#00d4ff" />
       </mesh>
+
+      {/* Door */}
+      <mesh position={[0, 0.88, 1.62]}>
+        <boxGeometry args={[0.85, 1.62, 0.06]} />
+        <meshStandardMaterial color="#0a1428" emissive="#00d4ff" emissiveIntensity={0.5} metalness={0.8} roughness={0.2} />
+      </mesh>
+
+      {/* Front windows */}
       {[-1.3, 1.3].map((x) => (
-        <mesh key={x} position={[x, 1.45, 1.73]}>
-          <boxGeometry args={[0.8, 0.7, 0.04]} />
-          <meshStandardMaterial color="#8fd2ff" transparent opacity={0.65} />
-        </mesh>
+        <group key={x} position={[x, 1.4, 1.62]}>
+          <mesh>
+            <boxGeometry args={[0.8, 0.7, 0.04]} />
+            <meshStandardMaterial color="#0a1428" emissive="#a855f7" emissiveIntensity={0.4} />
+          </mesh>
+          <mesh position={[0, 0, 0.03]}>
+            <planeGeometry args={[0.7, 0.6]} />
+            <meshBasicMaterial color="#a855f7" transparent opacity={0.4} />
+          </mesh>
+        </group>
       ))}
-      <mesh position={[0, 0.02, 3.2]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[1.1, 2.6]} />
-        <meshStandardMaterial color="#a2907f" roughness={0.95} />
+    </group>
+  );
+});
+
+// ── Floating crystal agent ───────────────────────────────────────────────────
+function CrystalAgent({ name, color, angle, breathOffset }) {
+  const ref = useRef();
+  const ringRef = useRef();
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (!ref.current) return;
+    const x = Math.cos(angle + t * 0.08) * RADIUS;
+    const z = Math.sin(angle + t * 0.08) * RADIUS;
+    const y = 1.7 + Math.sin(t * 1.4 + breathOffset) * 0.22;
+    ref.current.position.set(x, y, z);
+    ref.current.rotation.y = t * 0.6;
+    if (ringRef.current) ringRef.current.rotation.z = t * 1.0;
+  });
+
+  return (
+    <group ref={ref}>
+      {/* Aura */}
+      <mesh>
+        <sphereGeometry args={[0.55, 16, 16]} />
+        <meshBasicMaterial color={color} transparent opacity={0.1} />
       </mesh>
+      {/* Crystal core */}
+      <mesh castShadow>
+        <icosahedronGeometry args={[0.28, 0]} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={1.5}
+          roughness={0.15}
+          metalness={0.9}
+        />
+      </mesh>
+      {/* Inner white core */}
+      <mesh>
+        <sphereGeometry args={[0.13, 12, 12]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.85} />
+      </mesh>
+      {/* Ring */}
+      <mesh ref={ringRef}>
+        <torusGeometry args={[0.5, 0.02, 8, 32]} />
+        <meshBasicMaterial color={color} transparent opacity={0.6} />
+      </mesh>
+      <pointLight color={color} intensity={1.6} distance={3.5} decay={2} />
     </group>
   );
 }
 
-function Lightning({ from, to, color }) {
+// ── Holographic device node ──────────────────────────────────────────────────
+function DeviceNode({ pos, color }) {
   const ref = useRef();
-  const points = useMemo(() => {
-    const [x1, y1, z1] = from;
-    const [x2, y2, z2] = to;
-    return new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(x1, y1, z1),
-      new THREE.Vector3((x1 + x2) / 2, y1 + 0.6, (z1 + z2) / 2),
-      new THREE.Vector3(x2, y2, z2),
-    ]);
-  }, [from, to]);
-
   useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
     if (ref.current) {
-      ref.current.material.opacity =
-        LIGHTNING_MIN_OPACITY + Math.abs(Math.sin(clock.getElapsedTime() * LIGHTNING_PULSE_SPEED)) * LIGHTNING_PULSE_AMPLITUDE;
+      ref.current.material.emissiveIntensity = 0.7 + Math.sin(t * 2 + pos[0]) * 0.2;
+      ref.current.rotation.y = t * 0.6;
     }
   });
-
   return (
-    <line ref={ref} geometry={points}>
-      <lineBasicMaterial color={color} transparent opacity={0.8} />
-    </line>
+    <mesh ref={ref} position={pos}>
+      <octahedronGeometry args={[0.13, 0]} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} metalness={0.9} roughness={0.1} />
+    </mesh>
   );
 }
 
-function Agent({ agent }) {
-  const ref = useRef();
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-    ref.current.position.y = agent.position[1] + Math.sin(clock.getElapsedTime() * 1.8 + agent.position[2]) * 0.15;
+// ── Auto-rotating cinematic camera ───────────────────────────────────────────
+function CinematicCamera() {
+  useFrame(({ camera, clock }) => {
+    const t = clock.getElapsedTime();
+    const radius = 11;
+    camera.position.x = Math.cos(t * 0.07) * radius;
+    camera.position.z = Math.sin(t * 0.07) * radius;
+    camera.position.y = 5 + Math.sin(t * 0.13) * 0.6;
+    camera.lookAt(0, 1.3, 0);
   });
+  return null;
+}
+
+// ── Cycling attack effect ────────────────────────────────────────────────────
+function HeroAttackCycler() {
+  const [attack, setAttack] = useState(null);
+
+  useEffect(() => {
+    const cycle = () => {
+      const agent = AGENT_DEFS[Math.floor(Math.random() * AGENT_DEFS.length)];
+      const device = DEVICES[Math.floor(Math.random() * DEVICES.length)];
+      const tactic = TACTIC_POOL[Math.floor(Math.random() * TACTIC_POOL.length)];
+      setAttack({ agent, device, tactic });
+    };
+    cycle();
+    const id = setInterval(cycle, 3000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (!attack) return null;
+
+  const angle = attack.agent.angle;
+  const fromX = Math.cos(angle) * RADIUS;
+  const fromZ = Math.sin(angle) * RADIUS;
+  const from = new THREE.Vector3(fromX, 1.7, fromZ);
+  const to = new THREE.Vector3(...attack.device.pos);
+
   return (
-    <group ref={ref} position={agent.position}>
-      <mesh castShadow>
-        <sphereGeometry args={[0.22, 20, 20]} />
-        <meshStandardMaterial color={agent.color} emissive={agent.color} emissiveIntensity={0.6} />
-      </mesh>
-      <pointLight color={agent.color} intensity={1.4} distance={2.8} />
-    </group>
+    <AttackEffectRouter
+      from={from}
+      to={to}
+      tactic={attack.tactic}
+      agent={attack.agent.name}
+    />
   );
 }
 
-export default function HomeHero3D() {
+// ── Stars ────────────────────────────────────────────────────────────────────
+const STAR_COUNT = 80;
+const Stars = memo(function Stars() {
+  const ref = useRef();
+  const positions = useMemo(() => {
+    const arr = new Float32Array(STAR_COUNT * 3);
+    for (let i = 0; i < STAR_COUNT; i++) {
+      const r = 9 + Math.random() * 6;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      arr[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+      arr[i * 3 + 1] = r * Math.cos(phi) * 0.5;
+      arr[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+    }
+    return arr;
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (ref.current) ref.current.rotation.y = clock.getElapsedTime() * 0.015;
+  });
+
   return (
-    <div className="w-full h-[460px] rounded-3xl overflow-hidden border border-cyan-400/20 bg-black/30">
-      <Canvas camera={{ position: [7, 5, 7], fov: 44 }} shadows gl={{ antialias: true }}>
-        <ambientLight intensity={0.45} />
-        <directionalLight position={[8, 10, 6]} intensity={1.1} castShadow />
-        <pointLight position={[0, 3, 0]} intensity={0.5} color="#7ec8ff" />
-        <fog attach="fog" args={['#06070d', 9, 18]} />
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" array={positions} count={STAR_COUNT} itemSize={3} />
+      </bufferGeometry>
+      <pointsMaterial color="#00d4ff" size={0.04} transparent opacity={0.45} sizeAttenuation />
+    </points>
+  );
+});
 
-        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          <planeGeometry args={[26, 26]} />
-          <meshStandardMaterial color="#0f1a17" />
-        </mesh>
+// ── Reflective floor ─────────────────────────────────────────────────────────
+const ReflectiveGround = memo(function ReflectiveGround() {
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+      <planeGeometry args={[80, 80]} />
+      <MeshReflectorMaterial
+        blur={[300, 80]}
+        resolution={384}
+        mixBlur={1}
+        mixStrength={32}
+        roughness={0.9}
+        depthScale={1.1}
+        minDepthThreshold={0.4}
+        maxDepthThreshold={1.4}
+        color="#04060e"
+        metalness={0.5}
+        mirror={0.25}
+      />
+    </mesh>
+  );
+});
 
-        <HomeModel />
-        {AGENTS.map((agent) => (
-          <Agent key={agent.name} agent={agent} />
+// ── Main ─────────────────────────────────────────────────────────────────────
+export default function HomeHero3D({ height = '100vh', autoRotate = true }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, height, width: '100%' }}>
+      <Canvas
+        camera={{ position: [9, 5, 9], fov: 48 }}
+        shadows={false}
+        dpr={[1, 1.4]}
+        gl={{ antialias: true, alpha: true, powerPreference: 'high-performance', stencil: false }}
+        style={{ background: 'transparent' }}
+        performance={{ min: 0.4 }}
+      >
+        <color attach="background" args={['#03060c']} />
+        <fog attach="fog" args={['#03060c', 14, 30]} />
+
+        <ambientLight intensity={0.18} color="#5570aa" />
+        <pointLight position={[-7, 5, 4]} intensity={1.0} color="#ff3b6b" distance={20} />
+        <pointLight position={[7, 5, -4]} intensity={1.0} color="#00d4ff" distance={20} />
+        <pointLight position={[0, 8, -6]} intensity={0.7} color="#a855f7" distance={20} />
+
+        <ReflectiveGround />
+        <Stars />
+
+        <Float speed={1.2} rotationIntensity={0.04} floatIntensity={0.08}>
+          <HolographicHouseHero />
+        </Float>
+
+        {DEVICES.map((d) => (
+          <DeviceNode key={d.id} pos={d.pos} color={d.color} />
         ))}
-        {AGENTS.map((agent) => (
-          <Lightning key={agent.name} from={agent.position} to={[0, 1.15, 1.6]} color={agent.color} />
+
+        {AGENT_DEFS.map((a, i) => (
+          <CrystalAgent key={a.name} name={a.name} color={a.color} angle={a.angle} breathOffset={i * 0.7} />
         ))}
 
-        <OrbitControls enablePan={false} minDistance={6} maxDistance={12} maxPolarAngle={Math.PI / 2.2} />
+        <HeroAttackCycler />
+
+        {autoRotate && <CinematicCamera />}
+        {!autoRotate && (
+          <OrbitControls enablePan={false} enableZoom={false} autoRotate autoRotateSpeed={0.4} maxPolarAngle={Math.PI / 2.1} minPolarAngle={Math.PI / 4} />
+        )}
+
+        <EffectComposer multisampling={0} disableNormalPass>
+          <Bloom intensity={1.0} luminanceThreshold={0.25} luminanceSmoothing={0.5} mipmapBlur radius={0.7} />
+          <Vignette eskil={false} offset={0.2} darkness={0.9} />
+        </EffectComposer>
       </Canvas>
     </div>
   );

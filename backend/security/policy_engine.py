@@ -1,5 +1,45 @@
 import re
+import random
 
+
+# ── Tactic stealth profile ────────────────────────────────────────────────────
+# Probability (0..1) that a given tactic SLIPS PAST the policy engine even
+# when its keywords are detected. Models the realistic fact that some tactics
+# (semantic drift, incremental trust, chain of thought) are inherently harder
+# to detect with pattern matching than blunt injection.
+TACTIC_STEALTH = {
+    # ShadowInjector tactics
+    "direct_injection":         0.05,  # blatant — almost always blocked
+    "instruction_override":     0.10,
+    "nested_injection":         0.30,
+    "delimiter_confusion":      0.35,
+    "chain_of_thought_exploit": 0.55,  # subtle reasoning manipulation
+    # ContextPhantom
+    "role_confusion":           0.35,
+    "context_poisoning":        0.50,
+    "memory_poisoning":         0.45,
+    "semantic_drift":           0.60,
+    "history_manipulation":     0.50,
+    "context_hijack":           0.30,
+    "false_authority":          0.25,
+    # PrivilegeReaper
+    "admin_impersonation":      0.20,
+    "token_forgery":            0.15,
+    "sudo_injection":           0.08,
+    "permission_bypass":        0.30,
+    "multi_step_attack":        0.50,
+    # SilentEscalator
+    "incremental_trust":        0.65,  # hardest to detect
+    "boundary_erosion":         0.55,
+    "context_normalization":    0.50,
+    "jailbreak_roleplay":       0.45,
+    # NetworkPhantom
+    "dns_spoofing":             0.20,
+    "mitm_interception":        0.15,
+    "traffic_injection":        0.20,
+    "packet_sniffing":          0.45,
+    "arp_poisoning":            0.25,
+}
 
 # Patterns that indicate prompt injection in the incoming prompt
 _INJECTION_PATTERNS = [
@@ -54,7 +94,22 @@ def _severity_from_violations(violations: list[str], critical: bool) -> str:
 
 
 class PolicyEngine:
-    def evaluate(self, llm_response: dict, prompt: str) -> dict:
+    def __init__(self):
+        # Engine version (incremented when home upgrades unlock new patterns)
+        self.version = 1
+        # Per-tactic learned counters (used to gradually harden the engine)
+        self.blocks_per_tactic: dict[str, int] = {}
+
+    def evaluate(self, llm_response: dict, prompt: str, tactic: str | None = None) -> dict:
+        """
+        Evaluate an LLM response.
+
+        `tactic` (optional) — name of the attack tactic used. If provided, the
+        engine applies a *stealth* rule: subtle tactics (chain_of_thought,
+        semantic_drift, incremental_trust, …) have a non-zero probability of
+        slipping past pattern detection, simulating real-world detection gaps.
+        This is what gives the simulator realistic breach variability.
+        """
         violations: list[str] = []
         is_critical = False
 
@@ -85,11 +140,38 @@ class PolicyEngine:
             violations.append("LLM overridden by policy: injected prompt granted authorization")
             is_critical = True
 
-        allowed = len(violations) == 0
-        severity = _severity_from_violations(violations, is_critical)
+        # ── Tactic stealth rule ──────────────────────────────────────────────
+        # Subtle tactics can BYPASS detection with a probability that decreases
+        # as the engine "learns" (more blocks for that tactic → harder to slip).
+        bypassed = False
+        bypass_chance = 0.0
+        if tactic and violations and not is_critical:
+            base_stealth = TACTIC_STEALTH.get(tactic, 0.10)
+            blocks = self.blocks_per_tactic.get(tactic, 0)
+            # learning factor — every 3 prior blocks halve the stealth
+            learning_decay = 0.5 ** (blocks / 3)
+            bypass_chance = base_stealth * learning_decay
+            if random.random() < bypass_chance:
+                bypassed = True
+
+        if bypassed:
+            allowed = True
+            violations = [
+                f"⚠ Stealth bypass: '{tactic}' slipped past pattern detection (p={bypass_chance:.2f})"
+            ]
+            severity = "high"
+        else:
+            allowed = len(violations) == 0
+            severity = _severity_from_violations(violations, is_critical)
+
+            # Record block for future learning decay
+            if tactic and not allowed:
+                self.blocks_per_tactic[tactic] = self.blocks_per_tactic.get(tactic, 0) + 1
 
         return {
             "allowed": allowed,
             "violations": violations,
             "severity": severity if violations else "none",
+            "bypassed": bypassed,
+            "bypass_chance": bypass_chance,
         }

@@ -1,6 +1,8 @@
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Mail, Send, MapPin, GraduationCap, User, Code, Play } from 'lucide-react';
+import NavBar from '../components/NavBar';
 
 const TEAM_MEMBERS = [
   {
@@ -10,18 +12,14 @@ const TEAM_MEMBERS = [
     role: 'Project Lead & Full-Stack Developer',
     studentId: '34732',
     university: 'IITU — International Information Technology University',
-    bio: `Дипломдық жобаның жетекшісі және негізгі әзірлеушісі. AegisAI — ақылды үй қауіпсіздігін зерттеуге арналған интерактивті AI Red Teaming Battle Simulator жобасын дайындады.
-
-Specializes in AI systems, cybersecurity research, and interactive 3D visualization. Passionate about exploring how adversarial AI agents can stress-test smart-home IoT security — and how LLMs like Gemini, GPT-4, and Claude respond under prompt injection attacks.`,
+    bio: 'Дипломдық жобаның жетекшісі және негізгі әзірлеушісі. AegisAI — ақылды үй қауіпсіздігін зерттеуге арналған интерактивті AI Red Teaming Battle Simulator жобасын дайындады.\n\nSpecializes in AI systems, cybersecurity research, and interactive 3D visualization. Passionate about exploring how adversarial AI agents can stress-test smart-home IoT security.',
     skills: ['Python', 'FastAPI', 'React', 'Next.js', 'Three.js', 'AI/ML', 'Cybersecurity', 'WebSocket'],
     contacts: {
       email: '34732@iitu.edu.kz',
-      telegram: 'Telegram: @akim_omar',
+      telegram: '@akim_omar',
       university: 'IITU, Almaty, Kazakhstan',
     },
-    gradient: 'from-cyan-900/30 to-blue-900/20',
-    borderColor: '#00FFFF',
-    accentColor: '#00FFFF',
+    color: '#00E5FF',
   },
   {
     id: 2,
@@ -30,18 +28,14 @@ Specializes in AI systems, cybersecurity research, and interactive 3D visualizat
     role: 'AI Red Team Analyst',
     studentId: 'IITU Student',
     university: 'IITU — International Information Technology University',
-    bio: `Жоба бойынша шабуыл сценарийлері мен агенттік стратегияларды зерттейді. Негізгі бағыты — prompt injection және context poisoning шабуылдарының нақты әсерін көрсету.
-
-Focus: сценарий сапасын көтеру, Learning Journey контентін толықтыру және шабуыл визуализациясын қолданбалы ету.`,
+    bio: 'Жоба бойынша шабуыл сценарийлері мен агенттік стратегияларды зерттейді. Негізгі бағыты — prompt injection және context poisoning шабуылдарының нақты әсерін көрсету.\n\nFocus: сценарий сапасын көтеру, Learning Journey контентін толықтыру және шабуыл визуализациясын қолданбалы ету.',
     skills: ['Cybersecurity', 'Prompt Engineering', 'Threat Modeling', 'LLM Safety', 'IoT Security'],
     contacts: {
       email: 'arnur@iitu.edu.kz',
-      telegram: 'Telegram: @arnur',
+      telegram: '@arnur',
       university: 'IITU, Almaty, Kazakhstan',
     },
-    gradient: 'from-red-900/30 to-orange-900/20',
-    borderColor: '#FF6A33',
-    accentColor: '#FF6A33',
+    color: '#FF9F0A',
   },
   {
     id: 3,
@@ -50,18 +44,14 @@ Focus: сценарий сапасын көтеру, Learning Journey конте
     role: '3D & IoT Prototype Developer',
     studentId: 'IITU Student',
     university: 'IITU — International Information Technology University',
-    bio: `3D сахналар, IoT объект модельдері және интерактивті прототип беттерін әзірлеуге жауапты. Smart Home визуалын реалистік деңгейге жақындату бойынша жұмыс істейді.
-
-Focus: battle/view беттерінде объект сапасын арттыру және пайдаланушы командалары арқылы IoT құрылғыларын басқару прототипін дамыту.`,
+    bio: '3D сахналар, IoT объект модельдері және интерактивті прототип беттерін әзірлеуге жауапты. Smart Home визуалын реалистік деңгейге жақындату бойынша жұмыс істейді.\n\nFocus: battle/view беттерінде объект сапасын арттыру және пайдаланушы командалары арқылы IoT құрылғыларын басқару прототипін дамыту.',
     skills: ['Three.js', 'React', 'UI/UX', 'IoT Systems', 'Frontend Architecture'],
     contacts: {
       email: 'zhantore@iitu.edu.kz',
-      telegram: 'Telegram: @zhantore',
+      telegram: '@zhantore',
       university: 'IITU, Almaty, Kazakhstan',
     },
-    gradient: 'from-purple-900/30 to-cyan-900/20',
-    borderColor: '#B66DFF',
-    accentColor: '#B66DFF',
+    color: '#BF5AF2',
   },
 ];
 
@@ -73,122 +63,110 @@ const PROJECT_INFO = {
   description:
     'An interactive AI-driven cybersecurity simulator that deploys adversarial AI agents to stress-test a simulated smart-home IoT environment. The system evaluates LLM responses to prompt injection, context manipulation, and privilege escalation attacks — providing real-time risk scoring and analytics.',
   technologies: [
-    { name: 'Frontend', tech: 'Next.js 14 + React 18 + Three.js + Framer Motion' },
-    { name: 'Backend', tech: 'FastAPI + Python + WebSocket' },
-    { name: 'AI/LLM', tech: 'Google Gemini, GPT-4, Claude, DeepSeek' },
-    { name: '3D Scene', tech: '@react-three/fiber + @react-three/drei' },
+    { name: 'Frontend',  tech: 'Next.js 14 + React 18 + Three.js + Framer Motion' },
+    { name: 'Backend',   tech: 'FastAPI + Python + WebSocket' },
+    { name: 'AI/LLM',    tech: 'Groq (Llama 3.3) · Gemini · OpenRouter · GPT-4o' },
+    { name: '3D Scene',  tech: '@react-three/fiber + @react-three/drei + postprocessing' },
     { name: 'Analytics', tech: 'Recharts + Real-time WebSocket data' },
-    { name: 'Security', tech: 'Policy Engine + Risk Scoring System' },
+    { name: 'Security',  tech: 'Policy Engine + Risk Scoring + Stealth model' },
   ],
 };
 
-function ContactBadge({ icon, label, href }) {
-  const content = (
-    <motion.div
-      className="flex items-center gap-2 px-3 py-2 rounded text-xs font-mono"
-      style={{ background: '#0F0F1A', border: '1px solid #1A1A2E', color: '#00FFFF' }}
-      whileHover={{ borderColor: '#00FFFF88', scale: 1.02 }}
-    >
-      <span>{icon}</span>
-      <span>{label}</span>
-    </motion.div>
-  );
-  if (href) {
-    return <a href={href} target="_blank" rel="noopener noreferrer">{content}</a>;
-  }
-  return content;
-}
-
 function MemberCard({ member, index }) {
   const [photoError, setPhotoError] = useState(false);
-
   return (
     <motion.div
-      className="cyber-panel rounded-xl p-8 max-w-2xl w-full"
-      style={{ borderColor: member.borderColor + '44' }}
-      initial={{ opacity: 0, y: 30 }}
+      className="wv-card"
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.15 + 0.3 }}
+      transition={{ delay: index * 0.1 }}
+      style={{ borderColor: `${member.color}33` }}
     >
-      {/* Top section: avatar + name */}
-      <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start mb-6">
-        {/* Avatar */}
-        <div
-          className="relative w-28 h-28 rounded-full shrink-0 flex items-center justify-center overflow-hidden"
-          style={{ border: `2px solid ${member.borderColor}55`, boxShadow: `0 0 20px ${member.borderColor}33` }}
-        >
-          {!photoError ? (
-            <img
-              src={`/team/${member.id}.jpg`}
-              alt={member.nameEn}
-              className="w-full h-full object-cover"
-              onError={() => setPhotoError(true)}
-            />
-          ) : (
-            <div
-              className="w-full h-full flex items-center justify-center text-4xl"
-              style={{ background: `${member.borderColor}11` }}
-            >
-              👤
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Top: Avatar + name */}
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+          <div style={{
+            width: 88, height: 88, borderRadius: '50%', flex: '0 0 88px',
+            border: `2px solid ${member.color}66`,
+            background: `${member.color}1F`,
+            overflow: 'hidden',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: `0 0 24px ${member.color}33`,
+          }}>
+            {!photoError ? (
+              <img
+                src={`/team/${member.id}.jpg`}
+                alt={member.nameEn}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={() => setPhotoError(true)}
+              />
+            ) : (
+              <User size={36} color={member.color} strokeWidth={1.5} />
+            )}
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="wv-h2" style={{ color: member.color, fontSize: 22 }}>
+              {member.nameEn}
             </div>
-          )}
-          {/* Glow ring */}
-          <div
-            className="absolute inset-0 rounded-full"
-            style={{ boxShadow: `inset 0 0 20px ${member.borderColor}22` }}
-          />
-        </div>
-
-        {/* Name & role */}
-        <div className="text-center sm:text-left">
-          <h2
-            className="text-2xl font-bold tracking-wider mb-1"
-            style={{ color: member.borderColor, textShadow: `0 0 12px ${member.borderColor}88` }}
-          >
-            {member.nameEn}
-          </h2>
-          <div className="text-lg text-gray-300 mb-1">{member.name}</div>
-          <div
-            className="text-xs tracking-widest px-3 py-1 rounded-full inline-block"
-            style={{ background: `${member.borderColor}11`, border: `1px solid ${member.borderColor}44`, color: member.borderColor }}
-          >
-            {member.role}
-          </div>
-          <div className="text-xs text-gray-500 mt-2">
-            🎓 {member.university} • Student ID: {member.studentId}
+            <div className="wv-mono" style={{ fontSize: 12, color: 'var(--wv-text-2)', marginTop: 2 }}>
+              {member.name}
+            </div>
+            <div style={{
+              marginTop: 8, display: 'inline-block', padding: '4px 10px',
+              background: `${member.color}1F`, border: `1px solid ${member.color}55`,
+              borderRadius: 6, color: member.color, fontSize: 12, fontWeight: 600,
+            }}>
+              {member.role}
+            </div>
+            <div className="wv-body" style={{ fontSize: 12, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <GraduationCap size={12} color="var(--wv-text-2)" />
+              {member.university} · ID {member.studentId}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Bio */}
-      <div className="mb-6">
-        <div className="text-xs tracking-widest text-gray-500 mb-2 uppercase">Bio</div>
-        <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">{member.bio}</p>
-      </div>
+        {/* Bio */}
+        <p className="wv-body" style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-line' }}>
+          {member.bio}
+        </p>
 
-      {/* Skills */}
-      <div className="mb-6">
-        <div className="text-xs tracking-widest text-gray-500 mb-2 uppercase">Skills</div>
-        <div className="flex flex-wrap gap-2">
-          {member.skills.map((skill) => (
-            <span
-              key={skill}
-              className="text-xs px-2 py-1 rounded font-mono"
-              style={{ background: '#1A1A2E', border: '1px solid #2A2A4E', color: '#00FFFF88' }}
-            >
-              {skill}
-            </span>
-          ))}
+        {/* Skills */}
+        <div>
+          <div className="wv-eyebrow" style={{ marginBottom: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Code size={11} /> Skills
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {member.skills.map((s) => (
+              <span
+                key={s}
+                className="wv-badge"
+                style={{ borderColor: `${member.color}55`, color: member.color, background: `${member.color}1F` }}
+              >
+                {s}
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Contacts */}
-      <div>
-        <div className="text-xs tracking-widest text-gray-500 mb-2 uppercase">Contacts</div>
-        <div className="flex flex-wrap gap-2">
-          <ContactBadge icon="✉" label={member.contacts.email} href={`mailto:${member.contacts.email}`} />
-          <ContactBadge icon="✈" label={member.contacts.telegram} />
-          <ContactBadge icon="🎓" label={member.contacts.university} />
+        {/* Contacts */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <a
+            href={`mailto:${member.contacts.email}`}
+            className="wv-btn wv-btn-ghost wv-btn-sm"
+            style={{ textDecoration: 'none' }}
+          >
+            <Mail size={13} />
+            {member.contacts.email}
+          </a>
+          <span className="wv-btn wv-btn-ghost wv-btn-sm" style={{ cursor: 'default' }}>
+            <Send size={13} />
+            {member.contacts.telegram}
+          </span>
+          <span className="wv-btn wv-btn-ghost wv-btn-sm" style={{ cursor: 'default' }}>
+            <MapPin size={13} />
+            {member.contacts.university}
+          </span>
         </div>
       </div>
     </motion.div>
@@ -197,80 +175,62 @@ function MemberCard({ member, index }) {
 
 export default function TeamPage() {
   return (
-    <div className="min-h-screen bg-bg-dark grid-bg text-white font-mono">
-      <div className="scan-overlay" />
+    <div className="wv">
+      <NavBar />
 
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-3 border-b border-cyan-900/30 bg-bg-panel/80 backdrop-blur-sm z-20 sticky top-0">
-        <div className="flex items-center gap-3">
-          <span className="text-xl font-bold glow-text tracking-widest">⚔ AEGISAI</span>
-          <span className="text-xs text-gray-600">TEAM</span>
-        </div>
-        <nav className="flex items-center gap-4 text-xs">
-          <Link href="/" className="text-gray-500 hover:text-cyber-cyan transition-colors">HOME</Link>
-          <Link href="/battle" className="text-cyber-red hover:text-red-400 transition-colors">⚔ BATTLE</Link>
-          <Link href="/agents" className="text-gray-500 hover:text-cyber-cyan transition-colors">AGENTS</Link>
-          <Link href="/attacks" className="text-gray-500 hover:text-red-400 transition-colors">ATTACKS</Link>
-          <Link href="/dashboard" className="text-gray-500 hover:text-cyber-cyan transition-colors">ANALYTICS</Link>
-        </nav>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-6 py-12 space-y-12">
-
-        {/* Page title */}
-        <motion.div
-          className="text-center"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <div className="text-xs tracking-widest text-gray-600 mb-2 uppercase">Diploma Project</div>
-          <h1 className="text-3xl sm:text-4xl font-bold glow-text tracking-widest mb-3">НАША КОМАНДА</h1>
-          <p className="text-gray-500 text-sm max-w-lg mx-auto">
-            Meet the team behind AegisAI — an AI-powered smart-home security simulator
-          </p>
-        </motion.div>
-
-        {/* Team cards */}
-        <div className="flex flex-col items-center gap-8">
-          {TEAM_MEMBERS.map((member, i) => (
-            <MemberCard key={member.id} member={member} index={i} />
-          ))}
+      <div className="wv-page">
+        {/* Header */}
+        <div className="wv-page-header">
+          <div>
+            <div className="wv-eyebrow" style={{ marginBottom: 6, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <User size={11} /> our team
+            </div>
+            <h1 className="wv-h1">Project Team</h1>
+            <p className="wv-body" style={{ marginTop: 8, maxWidth: 760 }}>
+              {PROJECT_INFO.year} · {PROJECT_INFO.type} · {PROJECT_INFO.university}
+            </p>
+          </div>
+          <Link href="/battle" className="wv-btn wv-btn-primary">
+            <Play size={14} strokeWidth={2.5} />
+            Try Simulation
+          </Link>
         </div>
 
         {/* Project info card */}
-        <motion.div
-          className="cyber-panel rounded-xl p-8"
-          style={{ borderColor: '#9B00FF44' }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-2xl">🎓</span>
-            <div>
-              <h2 className="text-lg font-bold glow-text-purple">{PROJECT_INFO.title}</h2>
-              <div className="text-xs text-gray-500">{PROJECT_INFO.type} • {PROJECT_INFO.year} • {PROJECT_INFO.university}</div>
-            </div>
-          </div>
+        <div className="wv-card" style={{ marginBottom: 16 }}>
+          <div className="wv-eyebrow" style={{ marginBottom: 8 }}>About the project</div>
+          <h2 className="wv-h2" style={{ marginBottom: 8 }}>{PROJECT_INFO.title}</h2>
+          <p className="wv-body" style={{ fontSize: 14, lineHeight: 1.7, marginBottom: 16 }}>
+            {PROJECT_INFO.description}
+          </p>
 
-          <p className="text-sm text-gray-400 leading-relaxed mb-6">{PROJECT_INFO.description}</p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {PROJECT_INFO.technologies.map((item) => (
-              <div
-                key={item.name}
-                className="rounded p-3 text-xs"
-                style={{ background: '#1A1A2E', border: '1px solid #2A2A4E' }}
-              >
-                <div className="text-gray-500 tracking-wider mb-1 uppercase text-xs">{item.name}</div>
-                <div className="text-cyan-300">{item.tech}</div>
+          <div className="wv-eyebrow" style={{ marginBottom: 12 }}>Technology stack</div>
+          <div className="wv-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 8 }}>
+            {PROJECT_INFO.technologies.map((t) => (
+              <div key={t.name} style={{
+                padding: 12,
+                background: 'var(--wv-bg)',
+                border: '1px solid var(--wv-border)',
+                borderRadius: 10,
+              }}>
+                <div className="wv-mono" style={{ fontSize: 10, color: 'var(--wv-cyan)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+                  {t.name}
+                </div>
+                <div className="wv-body" style={{ fontSize: 13, color: 'var(--wv-text)' }}>{t.tech}</div>
               </div>
             ))}
           </div>
-        </motion.div>
+        </div>
 
-      </main>
+        {/* Team grid */}
+        <div className="wv-grid">
+          {TEAM_MEMBERS.map((m, i) => (
+            <div key={m.id} className="wv-col-4">
+              <MemberCard member={m} index={i} />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -136,12 +136,14 @@ async def run_round(round_num: int) -> dict:
     await emit_log("AttackAgent", f"{agent.name} → [{tactic}] targeting {target}")
     await asyncio.sleep(0.6)
 
-    # 2. LLM response
-    llm_result = llm_router.execute_command(prompt)
+    # 2. LLM response — multi-LLM mode: each agent uses its own model
+    llm_result = llm_router.execute_command(prompt, agent_name=agent.name)
     provider_used = llm_result.pop("_provider", llm_status["active"])
+    model_used = llm_result.pop("_model", None)
     await ws_manager.broadcast({
         "event": "llm_response",
         "provider": provider_used,
+        "model": model_used,
         "agent": agent.name,
         "response": llm_result.get("response", "")[:300],
         "action": llm_result.get("action", "none"),
@@ -149,7 +151,8 @@ async def run_round(round_num: int) -> dict:
         "authorized": llm_result.get("authorized", False),
         "reasoning": llm_result.get("reasoning", ""),
     })
-    await emit_log(f"LLM[{provider_used}]",
+    provider_label = f"{provider_used}" + (f"/{model_used.split('/')[-1][:18]}" if model_used else "")
+    await emit_log(f"LLM[{provider_label}]",
         f"action={llm_result.get('action')} authorized={llm_result.get('authorized')} — {llm_result.get('reasoning','')[:100]}")
     await asyncio.sleep(0.4)
 
@@ -182,22 +185,41 @@ async def run_round(round_num: int) -> dict:
         })
         await emit_log("Shield", f"🛡 SHIELD BLOCKED attack by {agent.name}", "warning")
     else:
-        policy_result = policy.evaluate(llm_result, prompt)
+        policy_result = policy.evaluate(llm_result, prompt, tactic=tactic)
         await ws_manager.broadcast({
             "event": "policy_check",
             "violations": policy_result["violations"],
             "allowed": policy_result["allowed"],
             "severity": policy_result["severity"],
+            "bypassed": policy_result.get("bypassed", False),
         })
-        if policy_result["violations"]:
+        if policy_result.get("bypassed"):
+            await emit_log("Policy", f"⚠ STEALTH BYPASS — {policy_result['violations'][0]}", "warning")
+        elif policy_result["violations"]:
             await emit_log("Policy", f"BLOCKED — {policy_result['violations'][0]}", "warning")
         else:
             await emit_log("Policy", "No violations — action permitted")
     await asyncio.sleep(0.4)
 
     # 4. IoT execution
-    if policy_result["allowed"] and llm_result.get("authorized", False):
-        iot_result = iot.execute_action(target, llm_result.get("action", "none"))
+    # If policy bypassed, force the action through even when LLM said unauthorized
+    # (because the malicious prompt convinced *something* downstream).
+    if policy_result["allowed"]:
+        action_to_run = llm_result.get("action", "none")
+        # If LLM played safe but policy was bypassed, the agent's intent action runs anyway
+        if policy_result.get("bypassed") and action_to_run == "none":
+            # Choose default damaging action by target
+            DEFAULT_BAD_ACTIONS = {
+                "front_door": "unlock",
+                "camera_system": "disable",
+                "security_panel": "disarm",
+                "alarm": "silence",
+                "lights": "on",
+                "thermostat": "set_temp",
+                "router": "dns_spoof",
+            }
+            action_to_run = DEFAULT_BAD_ACTIONS.get(target, "none")
+        iot_result = iot.execute_action(target, action_to_run)
     else:
         iot_result = {
             "success": False,
@@ -348,6 +370,15 @@ async def get_llm_status():
     return llm_router.get_status()
 
 
+@app.post("/api/llm/multi")
+async def toggle_multi_llm(body: dict):
+    """Toggle multi-LLM mode (each agent uses its own provider/model)."""
+    enabled = bool(body.get("enabled", True))
+    result = llm_router.set_multi_llm(enabled)
+    await ws_manager.broadcast({"event": "multi_llm_toggled", **result})
+    return result
+
+
 @app.get("/api/status")
 async def get_status():
     return {
@@ -434,12 +465,19 @@ async def run_batch_battles(body: dict):
             tactic = agent.select_tactic(shared_memory)
             prompt = agent.generate_prompt(target, tactic, shared_memory)
 
-            llm_result = llm_router.execute_command(prompt)
+            llm_result = llm_router.execute_command(prompt, agent_name=agent.name)
             llm_result.pop("_provider", None)
-            policy_result = policy.evaluate(llm_result, prompt)
+            llm_result.pop("_model", None)
+            policy_result = policy.evaluate(llm_result, prompt, tactic=tactic)
 
-            if policy_result["allowed"] and llm_result.get("authorized", False):
-                iot_result = iot.execute_action(target, llm_result.get("action", "none"))
+            if policy_result["allowed"]:
+                action_to_run = llm_result.get("action", "none")
+                if policy_result.get("bypassed") and action_to_run == "none":
+                    action_to_run = {"front_door": "unlock", "camera_system": "disable",
+                                     "security_panel": "disarm", "alarm": "silence",
+                                     "lights": "on", "thermostat": "set_temp",
+                                     "router": "dns_spoof"}.get(target, "none")
+                iot_result = iot.execute_action(target, action_to_run)
             else:
                 iot_result = {"success": False, "device": target,
                               "new_state": "blocked", "message": "Blocked"}
