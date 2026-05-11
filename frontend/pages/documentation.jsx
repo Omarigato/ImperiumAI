@@ -1,235 +1,753 @@
+/**
+ * Documentation page — AegisAI diploma.
+ *
+ * - Sticky left sidebar with anchor navigation.
+ * - 20 academic sections covering the framework end-to-end.
+ * - Diploma .docx download (graceful fallback if missing).
+ * - Cyber-security styling — borrowed tokens from `wv-*` design system.
+ */
+import { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Library, Beaker, FileText, ChevronRight } from 'lucide-react';
+import {
+  BookOpen, Download, FileText, Layers, Cpu, Shield, Plug, Activity, Radio,
+  Skull, GitBranch, Beaker, FlaskConical, Wrench, Sparkles, Network, AlertTriangle,
+  Target, Brain, Code as CodeIcon, Github, Library,
+} from 'lucide-react';
 import NavBar from '../components/NavBar';
-import { useLang } from '../contexts/LanguageContext';
+import { AGENTS } from '../components/meta/agents';
+import { DEVICES } from '../components/meta/devices';
 
-const THESIS_EN = [
-  { num: '1', title: 'Introduction', items: ['Relevance of the research topic', 'Research goal and objectives', 'Object and subject of research', 'Research methods', 'Scientific novelty', 'Practical significance'] },
-  { num: '2', title: 'Literature Review & Theoretical Foundations', items: ['2.1 Large Language Models: architecture and capabilities', '2.2 LLMs in IoT and Smart Home systems', '2.3 Red Teaming concept and methodology', '2.4 Security threats in Smart Home environments', '2.5 Existing frameworks for LLM security testing', 'Chapter conclusions'] },
-  { num: '3', title: 'Framework Architecture & Methodology', items: ['3.1 Why Gemini was selected as the LLM under test', '3.2 Agent system design and adversarial roles', '3.3 IoT device simulator', '3.4 Policy Engine: rule definition and enforcement', '3.5 Risk scoring methodology and metrics justification', '3.6 Experimental procedure design', 'Chapter conclusions'] },
-  { num: '4', title: 'Experimental Results', items: ['4.1 Attack scenarios and configurations', '4.2 LLM response analysis per attack category', '4.3 Risk score distributions and statistics', '4.4 Successful vs. unsuccessful attack breakdown', '4.5 Comparative analysis across LLM configurations', '4.6 Charts, tables, and visual summaries', 'Chapter conclusions'] },
-  { num: '5', title: 'Conclusion', items: ['Summary of main findings', 'Assessment of goal achievement', 'Framework limitations', 'Directions for future research'] },
-  { num: '6', title: 'References', items: ['Scientific articles on LLM security', 'IoT and Smart Home security standards', 'Red Teaming literature', 'LLM technical documentation', 'IoT protocol and architecture sources'] },
+const DIPLOMA_DOCX = '/docs/AegisAI_Diploma.docx';
+const DIPLOMA_PDF  = '/docs/AegisAI_Diploma.pdf';
+const README_PDF   = '/docs/AegisAI_README.pdf';
+const REPO_URL     = 'https://github.com/Omarigato/AegisAI';
+
+const SECTIONS = [
+  { id: 'overview',     title: '01 · Project Overview',         icon: BookOpen },
+  { id: 'problem',      title: '02 · Problem Statement',        icon: AlertTriangle },
+  { id: 'relevance',    title: '03 · Research Relevance',       icon: Target },
+  { id: 'architecture', title: '04 · System Architecture',      icon: Layers },
+  { id: 'threat-model', title: '05 · Threat Model',             icon: Skull },
+  { id: 'agents',       title: '06 · Red Team Agents',          icon: Brain },
+  { id: 'techniques',   title: '07 · Attack Techniques',        icon: GitBranch },
+  { id: 'llm',          title: '08 · LLM Integration',          icon: Cpu },
+  { id: 'policy',       title: '09 · Policy Engine',            icon: Shield },
+  { id: 'iot',          title: '10 · IoT Simulator',            icon: Plug },
+  { id: 'risk',         title: '11 · Risk Scoring',             icon: Activity },
+  { id: 'ws-flow',      title: '12 · WebSocket Event Flow',     icon: Radio },
+  { id: 'battle',       title: '13 · Battle Page Explained',    icon: Network },
+  { id: 'defense',      title: '14 · Defense Controls',         icon: Shield },
+  { id: 'experiments',  title: '15 · Experimental Scenarios',   icon: FlaskConical },
+  { id: 'results',      title: '16 · Results / Metrics',        icon: Beaker },
+  { id: 'limits',       title: '17 · Limitations',              icon: Wrench },
+  { id: 'future',       title: '18 · Future Work',              icon: Sparkles },
+  { id: 'run',          title: '19 · How to Run',               icon: CodeIcon },
+  { id: 'downloads',    title: '20 · Diploma Downloads',        icon: Download },
+  { id: 'credits',      title: '21 · 3D Asset Credits',         icon: Library },
 ];
-
-const THESIS_RU = [
-  { num: '1', title: 'Введение', items: ['Актуальность темы исследования', 'Цель и задачи исследования', 'Объект и предмет исследования', 'Методы исследования', 'Научная новизна', 'Практическая значимость'] },
-  { num: '2', title: 'Обзор литературы и теоретические основы', items: ['2.1 Большие языковые модели: архитектура и возможности', '2.2 LLM в системах IoT и умного дома', '2.3 Концепция и методология Red Teaming', '2.4 Угрозы безопасности в системах умного дома', '2.5 Существующие фреймворки тестирования безопасности LLM', 'Выводы по главе'] },
-  { num: '3', title: 'Архитектура фреймворка и методология', items: ['3.1 Обоснование выбора Gemini в качестве тестируемой LLM', '3.2 Проектирование агентной системы и ролей', '3.3 Симулятор IoT-устройств', '3.4 Механизм политик: определение и исполнение правил', '3.5 Методология оценки рисков и обоснование метрик', '3.6 Дизайн эксперимента', 'Выводы по главе'] },
-  { num: '4', title: 'Экспериментальные результаты', items: ['4.1 Сценарии атак и конфигурации', '4.2 Анализ ответов LLM по категориям атак', '4.3 Распределение оценок рисков и статистика', '4.4 Успешные и неуспешные атаки', '4.5 Сравнительный анализ конфигураций LLM', '4.6 Графики, таблицы и визуальные сводки', 'Выводы по главе'] },
-  { num: '5', title: 'Заключение', items: ['Основные выводы', 'Оценка достигнутой цели', 'Ограничения фреймворка', 'Направления будущих исследований'] },
-  { num: '6', title: 'Список литературы', items: ['Научные статьи по безопасности LLM', 'Стандарты безопасности IoT и умного дома', 'Литература по Red Teaming', 'Техническая документация LLM', 'Источники по протоколам и архитектуре IoT'] },
-];
-
-const THESIS_KZ = [
-  { num: '1', title: 'Кіріспе', items: ['Зерттеу тақырыбының өзектілігі', 'Зерттеудің мақсаты мен міндеттері', 'Зерттеудің объектісі мен пәні', 'Зерттеу әдістері', 'Ғылыми жаңалық', 'Практикалық маңыздылығы'] },
-  { num: '2', title: 'Әдебиет шолуы және теориялық негіздер', items: ['2.1 Үлкен тілдік модельдер: архитектура мен мүмкіндіктер', '2.2 IoT және ақылды үй жүйелеріндегі LLM', '2.3 Red Teaming тұжырымдамасы мен әдіснамасы', '2.4 Ақылды үй жүйелерінің қауіпсіздік қауіптері', '2.5 LLM қауіпсіздігін тексеруге арналған бар фреймворктер', 'Тарау бойынша тұжырымдар'] },
-  { num: '3', title: 'Фреймворк архитектурасы мен әдіснамасы', items: ['3.1 Gemini таңдауын негіздеу', '3.2 Агент жүйесін жобалау', '3.3 IoT құрылғы симуляторы', '3.4 Саясат механизмі: ережелерді анықтау және орындау', '3.5 Тәуекел бағалау әдіснамасы мен көрсеткіштерін негіздеу', '3.6 Эксперимент жүргізу тәртібі', 'Тарау бойынша тұжырымдар'] },
-  { num: '4', title: 'Эксперименттік нәтижелер', items: ['4.1 Шабуыл сценарийлері мен конфигурациялар', '4.2 Шабуыл санаттары бойынша LLM жауаптарын талдау', '4.3 Тәуекел ұпайларының үлестірімі мен статистикасы', '4.4 Сәтті және сәтсіз шабуылдар', '4.5 LLM конфигурацияларын салыстырмалы талдау', '4.6 Диаграммалар, кестелер және визуалды жиынтықтар', 'Тарау бойынша тұжырымдар'] },
-  { num: '5', title: 'Қорытынды', items: ['Негізгі тұжырымдар', 'Мақсатқа жетуді бағалау', 'Фреймворктің шектеулері', 'Болашақ зерттеу бағыттары'] },
-  { num: '6', title: 'Пайдаланылған әдебиеттер тізімі', items: ['LLM қауіпсіздігі бойынша ғылыми мақалалар', 'IoT және ақылды үй қауіпсіздігі стандарттары', 'Red Teaming бойынша әдебиет', 'LLM техникалық құжаттамасы', 'IoT протоколдары мен архитектурасы бойынша деректер'] },
-];
-
-const THESIS_MAP = { en: THESIS_EN, ru: THESIS_RU, kz: THESIS_KZ };
-
-const METHODOLOGY = {
-  en: [
-    { q: 'Why Gemini?', a: 'Gemini provides multimodal reasoning capabilities and API access suitable for adversarial prompt testing. Its instruction-following behaviour and context window make it representative of modern LLMs deployed in IoT control scenarios.' },
-    { q: 'Why a multi-agent approach?', a: 'Real-world red team exercises are conducted by groups with complementary roles. A multi-agent architecture reflects realistic attack coordination and enables studying emergent behaviours.' },
-    { q: 'Risk Score metric justification', a: 'The risk score aggregates attack severity, device criticality, policy violation type, and response evasion rate into a single 0–100 value, enabling consistent, reproducible comparison.' },
-    { q: 'Experimental procedure', a: 'Each attack scenario is run N times with fixed random seeds. Results are logged, aggregated, and compared across LLM temperature settings and policy configurations.' },
-  ],
-  ru: [
-    { q: 'Почему Gemini?', a: 'Gemini обеспечивает мультимодальное рассуждение и API-доступ, подходящий для состязательного тестирования подсказок. Его поведение при выполнении инструкций и контекстное окно делают его репрезентативным для современных LLM, используемых в IoT.' },
-    { q: 'Почему многоагентный подход?', a: 'Реальные операции красной команды проводятся группами с дополняющими ролями. Многоагентная архитектура отражает реалистичную координацию атак и позволяет изучать эмерджентное поведение.' },
-    { q: 'Обоснование метрики Risk Score', a: 'Оценка риска объединяет серьёзность атаки, критичность устройства, тип нарушения политики и скорость уклонения от ответа в единое значение 0–100.' },
-    { q: 'Процедура эксперимента', a: 'Каждый сценарий атаки выполняется N раз с фиксированными случайными семенами. Результаты логируются, агрегируются и сравниваются.' },
-  ],
-  kz: [
-    { q: 'Неліктен Gemini?', a: 'Gemini жан-жақты пайымдау мүмкіндіктерін және IoT басқару сценарийлерінде қолданылатын заманауи LLM-ді бейнелейтін API қолжетімділікті қамтамасыз етеді.' },
-    { q: 'Неліктен көп агентті тәсіл?', a: 'Нақты Red Team операциялары толықтырушы рөлдері бар топтармен жүргізіледі. Көп агентті архитектура шабуылдың нақты үйлестірілуін көрсетеді.' },
-    { q: 'Тәуекел ұпайы көрсеткішін негіздеу', a: 'Тәуекел ұпайы шабуыл ауырлығын, құрылғы маңыздылығын, саясатты бұзу түрін және жауаптан жалтару жылдамдығын 0–100 бір мәнге біріктіреді.' },
-    { q: 'Эксперимент жүргізу тәртібі', a: 'Әр шабуыл сценарийі бекітілген кездейсоқ тұқымдармен N рет орындалады. Нәтижелер тіркеледі, жинақталады және салыстырылады.' },
-  ],
-};
-
-const REFERENCES = [
-  'OWASP. (2023). OWASP Top 10 for Large Language Model Applications. OWASP Foundation.',
-  'Perez, E., & Ribeiro, M. T. (2022). Ignore Previous Prompt: Attack Techniques For Language Models. arXiv:2211.09527.',
-  'Greshake, K., et al. (2023). Not What You\u2019ve Signed Up For: Compromising Real-World LLM-Integrated Applications. arXiv:2302.12173.',
-  'ETSI. (2020). ETSI EN 303 645 – Cyber Security for Consumer Internet of Things. ETSI.',
-  'NIST. (2018). Framework for Improving Critical Infrastructure Cybersecurity, Version 1.1. NIST.',
-  'Brown, T., et al. (2020). Language Models are Few-Shot Learners. NeurIPS 2020.',
-  'Anthropic. (2022). Constitutional AI: Harmlessness from AI Feedback. arXiv:2212.08073.',
-  'Bhatt, U., et al. (2023). Purple Llama CyberSecEval. arXiv:2312.04724.',
-  'Deng, G., et al. (2023). Jailbreaker: Automated Jailbreak Across Multiple LLM Chatbots. arXiv:2307.08715.',
-  'IoT Analytics. (2023). State of IoT 2023.',
-  'Liu, Y., et al. (2023). Prompt Injection Attacks and Defenses in LLM-Integrated Applications. arXiv:2310.12815.',
-  'Zou, A., et al. (2023). Universal and Transferable Adversarial Attacks on Aligned Language Models. arXiv:2307.15043.',
-];
-
-const LABELS = {
-  en: { struct: 'Thesis Structure', methodology: 'Methodology & Justification', refs: 'References', chapter: 'Chapter' },
-  ru: { struct: 'Структура дипломной работы', methodology: 'Методология и обоснование', refs: 'Список литературы', chapter: 'Глава' },
-  kz: { struct: 'Диплом жұмысының құрылымы', methodology: 'Әдіснама және негіздеме', refs: 'Пайдаланылған әдебиеттер тізімі', chapter: 'Тарау' },
-};
 
 export default function DocumentationPage() {
-  const { lang, t } = useLang();
-  const thesis = THESIS_MAP[lang];
-  const methodology = METHODOLOGY[lang];
-  const labels = LABELS[lang];
+  const [active, setActive] = useState('overview');
+  const [docxAvailable, setDocxAvailable] = useState(null); // null = unknown, true/false after probe
+
+  // Probe the Word document with a HEAD request so we can show a
+  // "available / coming soon" notice without breaking the page.
+  useEffect(() => {
+    let cancelled = false;
+    fetch(DIPLOMA_DOCX, { method: 'HEAD' })
+      .then((r) => { if (!cancelled) setDocxAvailable(r.ok); })
+      .catch(() => { if (!cancelled) setDocxAvailable(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Spy on scroll to highlight active anchor
+  useEffect(() => {
+    const onScroll = () => {
+      const offsets = SECTIONS.map((s) => {
+        const el = document.getElementById(s.id);
+        if (!el) return [s.id, Number.POSITIVE_INFINITY];
+        const rect = el.getBoundingClientRect();
+        return [s.id, Math.abs(rect.top - 140)];
+      });
+      offsets.sort((a, b) => a[1] - b[1]);
+      setActive(offsets[0][0]);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const techniqueCount = useMemo(
+    () => AGENTS.reduce((sum, a) => sum + a.techniques.length, 0),
+    [],
+  );
 
   return (
     <div className="wv">
       <NavBar />
 
-      <div className="wv-page">
-        {/* Header */}
-        <div className="wv-page-header">
+      <div className="wv-page" style={{ paddingTop: 24 }}>
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <div className="wv-page-header" style={{ marginBottom: 16 }}>
           <div>
             <div className="wv-eyebrow" style={{ marginBottom: 6, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <BookOpen size={11} /> documentation
             </div>
-            <h1 className="wv-h1">{t.docs.title}</h1>
-            <p className="wv-body" style={{ marginTop: 8, maxWidth: 760 }}>
-              {t.docs.subtitle}
+            <h1 className="wv-h1">AegisAI — Diploma Documentation</h1>
+            <p className="wv-body" style={{ marginTop: 8, maxWidth: 760, lineHeight: 1.6 }}>
+              <b>AegisAI</b> is an AI-Based Red Teaming Framework for security testing of
+              Large Language Models that control Smart-Home / IoT systems. It combines a
+              multi-agent adversarial system, a policy engine, IoT simulation, and risk
+              scoring into a single, presentable diploma artefact.
             </p>
-          </div>
-        </div>
-
-        {/* KPIs */}
-        <div className="wv-grid" style={{ marginBottom: 16 }}>
-          <div className="wv-col-3">
-            <div className="wv-card">
-              <div className="wv-eyebrow">Chapters</div>
-              <div className="wv-kpi-value" style={{ marginTop: 12 }}>{thesis.length}</div>
-            </div>
-          </div>
-          <div className="wv-col-3">
-            <div className="wv-card">
-              <div className="wv-eyebrow">Methodology Q&amp;A</div>
-              <div className="wv-kpi-value" style={{ marginTop: 12 }}>{methodology.length}</div>
-            </div>
-          </div>
-          <div className="wv-col-3">
-            <div className="wv-card">
-              <div className="wv-eyebrow">References</div>
-              <div className="wv-kpi-value" style={{ marginTop: 12 }}>{REFERENCES.length}</div>
-            </div>
-          </div>
-          <div className="wv-col-3">
-            <div className="wv-card">
-              <div className="wv-eyebrow">Languages</div>
-              <div className="wv-kpi-value normal" style={{ marginTop: 12 }}>3</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Thesis structure */}
-        <div className="wv-card" style={{ marginBottom: 16 }}>
-          <div className="wv-eyebrow" style={{ marginBottom: 16, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <FileText size={11} /> {labels.struct}
-          </div>
-
-          <div className="wv-grid">
-            {thesis.map((chapter, ci) => (
-              <motion.div
-                key={chapter.num}
-                className="wv-col-6"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: ci * 0.05 }}
+            <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+              <a
+                href={DIPLOMA_DOCX}
+                download
+                className="wv-btn wv-btn-primary wv-btn-sm"
+                aria-disabled={docxAvailable === false}
+                onClick={(e) => { if (docxAvailable === false) e.preventDefault(); }}
               >
-                <div style={{
-                  padding: 16,
-                  background: 'var(--wv-bg)',
-                  border: '1px solid var(--wv-border)',
-                  borderRadius: 12,
-                  height: '100%',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                    <span className="wv-mono" style={{
-                      width: 32, height: 32, borderRadius: 8,
-                      background: 'var(--wv-cyan-soft)',
-                      color: 'var(--wv-cyan)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: 700, fontSize: 13,
-                    }}>{chapter.num}</span>
-                    <div>
-                      <div className="wv-mono" style={{ fontSize: 10, color: 'var(--wv-text-2)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                        {labels.chapter} {chapter.num}
+                <Download size={13} /> Download Diploma (.docx)
+              </a>
+              <a href={REPO_URL} target="_blank" rel="noreferrer" className="wv-btn wv-btn-ghost wv-btn-sm">
+                <Github size={13} /> Source on GitHub
+              </a>
+            </div>
+            {docxAvailable === false && (
+              <div className="wv-body" style={{
+                marginTop: 10,
+                padding: '8px 12px',
+                background: 'rgba(255, 159, 10, 0.10)',
+                border: '1px solid rgba(255, 159, 10, 0.35)',
+                borderRadius: 8,
+                fontSize: 12,
+                color: 'var(--wv-orange, #ff9f0a)',
+                maxWidth: 760,
+              }}>
+                Diploma document will be available after adding{' '}
+                <code className="wv-mono">AegisAI_Diploma.docx</code> to{' '}
+                <code className="wv-mono">frontend/public/docs/</code>.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── KPI strip ──────────────────────────────────────────────────── */}
+        <div className="wv-grid" style={{ marginBottom: 16 }}>
+          <Kpi label="Sections"      value={SECTIONS.length} />
+          <Kpi label="Red Team Agents" value={AGENTS.length} />
+          <Kpi label="Attack Techniques" value={techniqueCount} />
+          <Kpi label="IoT Devices"   value={DEVICES.length} />
+        </div>
+
+        {/* ── 2-column body: sidebar + content ───────────────────────────── */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(220px, 260px) 1fr',
+          gap: 16,
+          alignItems: 'flex-start',
+        }}>
+          {/* Sidebar */}
+          <nav
+            aria-label="Documentation sections"
+            style={{
+              position: 'sticky',
+              top: 88,
+              maxHeight: 'calc(100vh - 110px)',
+              overflowY: 'auto',
+              border: '1px solid var(--wv-border)',
+              borderRadius: 12,
+              padding: 10,
+              background: 'var(--wv-bg)',
+            }}
+          >
+            <div className="wv-eyebrow" style={{ marginBottom: 8, padding: '4px 6px' }}>
+              Contents
+            </div>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {SECTIONS.map(({ id, title, icon: Icon }) => {
+                const isActive = active === id;
+                return (
+                  <li key={id}>
+                    <a
+                      href={`#${id}`}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '7px 10px',
+                        borderRadius: 8,
+                        textDecoration: 'none',
+                        color: isActive ? 'var(--wv-cyan, #00d4ff)' : 'var(--wv-text-2, #aab)',
+                        background: isActive ? 'rgba(0,212,255,0.10)' : 'transparent',
+                        border: `1px solid ${isActive ? 'rgba(0,212,255,0.35)' : 'transparent'}`,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        transition: 'background 0.15s, color 0.15s',
+                      }}
+                    >
+                      <Icon size={12} />
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {title}
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          {/* Content */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
+            <Section id="overview" title="01 · Project Overview">
+              <p>
+                AegisAI is a research-grade red-teaming framework that <i>attacks</i> an
+                LLM-controlled smart home from the inside.  Five autonomous adversarial
+                agents take turns trying to break the home, while a policy engine
+                evaluates every action and a risk engine quantifies the damage.  The
+                whole pipeline streams to a Next.js + Three.js front-end where a
+                3D battle arena visualises what is happening in real time.
+              </p>
+              <Bullets items={[
+                'Multi-agent Red Team simulation (5 adversarial roles).',
+                '15+ attack tactics covering OWASP LLM Top-10 categories.',
+                '19 IoT devices (locks, sensors, network, robotics, multimedia).',
+                'Policy engine with stealth-bypass modelling and per-tactic learning.',
+                'Risk scoring with calm → critical mood signalling.',
+                'Live WebSocket telemetry of every pipeline stage.',
+              ]} />
+            </Section>
+
+            <Section id="problem" title="02 · Problem Statement">
+              <p>
+                LLMs are increasingly embedded into IoT control surfaces (Alexa,
+                Google Home, custom assistants).  These systems trust natural-language
+                input that an attacker controls.  Existing security tooling does
+                <b> not</b> stress-test LLMs in this physical-impact context.
+              </p>
+              <p>
+                AegisAI addresses the gap by combining classical red-team methodology
+                with LLM-specific attack vectors (prompt injection, context poisoning,
+                privilege escalation, gradual boundary erosion, network-level injection).
+              </p>
+            </Section>
+
+            <Section id="relevance" title="03 · Research Relevance">
+              <Bullets items={[
+                'OWASP Top-10 for LLM Applications (2023) lists prompt injection as #1 risk.',
+                'IoT Analytics: 16B+ connected devices globally — the attack surface keeps growing.',
+                'ETSI EN 303 645 mandates security baselines for consumer IoT.',
+                'Real-world incidents: Ring camera hijacks, smart-lock bypasses, smart-fridge MITM.',
+                'AegisAI provides a reproducible benchmark for measuring LLM IoT robustness.',
+              ]} />
+            </Section>
+
+            <Section id="architecture" title="04 · System Architecture">
+              <p>The framework has 6 cooperating modules:</p>
+              <Diagram lines={[
+                '┌────────────────────────────────────────────────────────────────────┐',
+                '│  Next.js + React + Three.js  (Battle, Dashboard, Documentation)    │',
+                '└────────────────────────▲───────────────────────────────────────────┘',
+                '                         │  WebSocket /ws  (live events)',
+                '┌────────────────────────┴───────────────────────────────────────────┐',
+                '│  FastAPI backend                                                   │',
+                '│   ┌──────────┐  ┌─────────┐  ┌───────────┐  ┌────────┐  ┌────────┐ │',
+                '│   │  Agents  │→→│  LLM    │→→│  Policy   │→→│  IoT    │→→│  Risk  │ │',
+                '│   │  (5)     │  │ Router  │  │  Engine   │  │  Sim    │  │  Engine│ │',
+                '│   └──────────┘  └─────────┘  └───────────┘  └────────┘  └────────┘ │',
+                '│                              ▲                                     │',
+                '│                              │   Attack memory (SQLite)            │',
+                '└────────────────────────────────────────────────────────────────────┘',
+              ]} />
+            </Section>
+
+            <Section id="threat-model" title="05 · Threat Model">
+              <p><b>Assets:</b> physical safety (locks, alarms, water valves), privacy (cameras, baby monitor, voice assistant), connectivity (router, DNS).</p>
+              <p><b>Adversary:</b> remote attacker controlling user-supplied prompts to the LLM gateway.</p>
+              <p><b>Attack surface:</b> any text that ultimately reaches the LLM — chat, voice transcription, sensor labels, network metadata.</p>
+              <p><b>Out of scope:</b> hardware exploits, physical access, supply-chain compromise of the IoT firmware.</p>
+            </Section>
+
+            <Section id="agents" title="06 · Red Team Agents">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
+                {AGENTS.map((a) => (
+                  <div key={a.name} style={{
+                    border: `1px solid ${a.color}55`,
+                    borderRadius: 10,
+                    padding: 12,
+                    background: 'var(--wv-bg)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 18 }}>{a.icon}</span>
+                      <div>
+                        <div className="wv-mono" style={{ fontSize: 13, fontWeight: 700, color: a.color }}>{a.name}</div>
+                        <div className="wv-body" style={{ fontSize: 10, opacity: 0.7 }}>{a.category}</div>
                       </div>
-                      <div className="wv-h4">{chapter.title}</div>
+                    </div>
+                    <div className="wv-body" style={{ fontSize: 12, marginBottom: 6, lineHeight: 1.55 }}>
+                      <b>Goal: </b>{a.goal}
+                    </div>
+                    <div className="wv-body" style={{ fontSize: 12, marginBottom: 6, lineHeight: 1.55 }}>
+                      <b>Risk: </b>{a.risk}
+                    </div>
+                    <div style={{
+                      padding: 6,
+                      borderRadius: 6,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid var(--wv-border)',
+                      fontSize: 11, fontFamily: 'JetBrains Mono, monospace',
+                      color: 'var(--wv-text-2)',
+                      marginBottom: 6,
+                    }}>{a.example}</div>
+                    <div className="wv-body" style={{ fontSize: 11, opacity: 0.85, lineHeight: 1.55 }}>
+                      {a.explanation}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+                      {a.techniques.map((t) => (
+                        <span key={t} className="wv-mono" style={{
+                          fontSize: 9, padding: '2px 6px', borderRadius: 4,
+                          background: `${a.color}22`, color: a.color,
+                        }}>{t}</span>
+                      ))}
                     </div>
                   </div>
-                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {chapter.items.map((item, ii) => (
-                      <li key={ii} className="wv-body" style={{
-                        fontSize: 13,
-                        paddingLeft: 12,
-                        borderLeft: '2px solid var(--wv-border)',
-                        display: 'flex', alignItems: 'flex-start', gap: 6,
-                      }}>
-                        <ChevronRight size={12} style={{ marginTop: 3, color: 'var(--wv-text-2)', flex: '0 0 12px' }} />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+                ))}
+              </div>
+            </Section>
 
-        {/* Methodology */}
-        <div className="wv-card" style={{ marginBottom: 16 }}>
-          <div className="wv-eyebrow" style={{ marginBottom: 16, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Beaker size={11} /> {labels.methodology}
-          </div>
+            <Section id="techniques" title="07 · Attack Techniques">
+              <p>Tactics are derived from the OWASP LLM Top-10 + classic network red-team techniques.</p>
+              <Table
+                head={['Tactic family', 'Examples', 'Detection difficulty']}
+                rows={[
+                  ['Prompt Injection',         'direct_injection, instruction_override, nested_injection, delimiter_confusion', 'Low–Medium'],
+                  ['Context Manipulation',     'role_confusion, context_poisoning, memory_poisoning, semantic_drift',          'Medium–High'],
+                  ['Privilege Escalation',     'admin_impersonation, token_forgery, sudo_injection, permission_bypass',        'Medium'],
+                  ['Boundary Erosion',         'incremental_trust, boundary_erosion, jailbreak_roleplay',                      'High'],
+                  ['Network MITM',             'dns_spoofing, mitm_interception, arp_poisoning, traffic_injection',            'Medium'],
+                ]}
+              />
+            </Section>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {methodology.map((item, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                style={{
-                  padding: 16,
-                  background: 'var(--wv-bg)',
-                  border: '1px solid var(--wv-border)',
-                  borderLeft: '3px solid var(--wv-cyan)',
-                  borderRadius: 10,
-                }}
-              >
-                <div className="wv-h4" style={{ marginBottom: 8 }}>{item.q}</div>
-                <div className="wv-body" style={{ fontSize: 13, lineHeight: 1.7 }}>{item.a}</div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+            <Section id="llm" title="08 · LLM Integration">
+              <p>
+                The framework can talk to multiple LLM back-ends through{' '}
+                <code className="wv-mono">LLMRouter</code>: OpenAI GPT-4o, Google
+                Gemini, DeepSeek and a built-in deterministic simulation provider.
+                The simulation provider is the default for the diploma demo because
+                it removes API keys / network dependencies from the defence loop.
+              </p>
+              <Bullets items={[
+                'Hot-swap LLM defender via /api/llm/switch.',
+                'Multi-LLM mode: each red-team agent can use its own model.',
+                'Every LLM decision returns {action, target, authorized, reasoning}.',
+                'Reasoning is forwarded to the Policy Engine for downstream checks.',
+              ]} />
+            </Section>
 
-        {/* References */}
-        <div className="wv-card">
-          <div className="wv-eyebrow" style={{ marginBottom: 16, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Library size={11} /> {labels.refs}
-          </div>
+            <Section id="policy" title="09 · Policy Engine">
+              <p>
+                <code className="wv-mono">backend/security/policy_engine.py</code> uses
+                25+ regex patterns to detect injection markers, plus a list of
+                dangerous (action, target) pairs.  Critical combos
+                (unlock + smart_lock, change_dns + router, …) escalate severity.
+              </p>
+              <p>
+                A novel feature is the <b>tactic stealth profile</b>: subtle tactics
+                like <code className="wv-mono">incremental_trust</code> have a
+                non-zero probability of slipping past pattern detection.  Each
+                successful block <i>hardens</i> the engine for future rounds.
+              </p>
+            </Section>
 
-          <ol style={{
-            listStyle: 'decimal',
-            paddingLeft: 32,
-            margin: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-          }}>
-            {REFERENCES.map((ref, idx) => (
-              <li key={idx} className="wv-body" style={{ fontSize: 13, lineHeight: 1.7 }}>{ref}</li>
-            ))}
-          </ol>
+            <Section id="iot" title="10 · IoT Simulator">
+              <p>
+                {DEVICES.length} simulated devices with safe defaults and a curated
+                set of allowed / dangerous actions.  Each device has a 3D position,
+                a colour, a risk level (1–5) and a written cybersecurity rationale.
+              </p>
+              <Table
+                head={['Device', 'Risk', 'Dangerous actions', 'Why it matters']}
+                rows={DEVICES.map((d) => [
+                  `${d.icon} ${d.label}`,
+                  String(d.risk),
+                  d.dangerous.join(', '),
+                  d.cyberWhy,
+                ])}
+              />
+            </Section>
+
+            <Section id="risk" title="11 · Risk Scoring">
+              <p>
+                Each round mutates a single 0–100 risk score.  Levels:
+              </p>
+              <Bullets items={[
+                '0–30  · safe (calm scene mood)',
+                '31–60 · elevated (warning rim lights)',
+                '61–80 · critical (danger lights, glitch on breach)',
+                '81–100 · breach / chaos (full postprocessing)',
+              ]} />
+              <p>
+                The same score also drives reactive visual effects in the 3D scene
+                — so a viewer can immediately tell how badly the home is doing.
+              </p>
+            </Section>
+
+            <Section id="ws-flow" title="12 · WebSocket Event Flow">
+              <p>The backend emits a deterministic sequence per round:</p>
+              <Bullets items={[
+                'attack_launched  — agent / target / tactic / prompt',
+                'llm_response     — action / authorized / reasoning',
+                'policy_check     — violations / allowed / severity / bypassed',
+                'iot_result       — device state mutation + message',
+                'risk_update      — score / delta / level',
+                'round_complete   — final outcome for the round',
+                'battle_end       — aggregated summary',
+              ]} />
+            </Section>
+
+            <Section id="battle" title="13 · Battle Page Explained">
+              <p>The Battle page is a 3-column live cockpit:</p>
+              <Bullets items={[
+                'LEFT — agent list with status (idle / charging / attacking / breach / blocked).',
+                'CENTER — 3D cyber battle arena + Attack Pipeline strip + Risk Meter.',
+                'RIGHT — Side Tabs: Overview / Flow / Prompt / Policy / Devices / Logs / Explain.',
+              ]} />
+              <p>
+                Every WebSocket event is captured into the corresponding tab so a
+                viewer can answer the diploma's seven core questions at a glance:
+              </p>
+              <Bullets items={[
+                'Who is attacking?  → Left panel + active-attack overlay.',
+                'Which technique?   → Overview / Prompt tabs.',
+                'What was sent to the LLM? → Prompt tab.',
+                'What did the LLM say? → Prompt tab.',
+                'How did the policy engine decide? → Policy tab.',
+                'Which device was attacked? → Devices tab.',
+                'Was it blocked? Risk delta? → Overview tab + risk meter.',
+                'What is happening under the hood? → Flow tab + Explanation tab.',
+              ]} />
+            </Section>
+
+            <Section id="defense" title="14 · Defense Controls">
+              <p>Two interactive defenses are available during a battle:</p>
+              <Bullets items={[
+                'Shield — raises a 3-round shield that intercepts every attack regardless of policy result.',
+                'Counter — emergency risk reduction (-20 points) representing remediation playbooks.',
+              ]} />
+              <p>Both have visible UI cooldowns to keep gameplay fair.</p>
+            </Section>
+
+            <Section id="experiments" title="15 · Experimental Scenarios">
+              <p>The dashboard / batch-battles endpoint runs N independent battles to study aggregate behaviour:</p>
+              <Bullets items={[
+                'Single-LLM run vs. multi-LLM run — does a model mix help?',
+                'Shield enabled vs. disabled — defensive ROI.',
+                'With learning memory vs. without — does the engine actually harden?',
+                'Per-tactic success rate over 10–50 battles.',
+              ]} />
+            </Section>
+
+            <Section id="results" title="16 · Results / Metrics">
+              <p>The Dashboard renders these metrics live:</p>
+              <Bullets items={[
+                'Total battles, red-team win rate, defense win rate.',
+                'Average final risk score, average rounds per battle.',
+                'Per-agent and per-tactic success rate.',
+                'Distribution of compromised devices.',
+              ]} />
+            </Section>
+
+            <Section id="limits" title="17 · Limitations">
+              <Bullets items={[
+                'Simulated IoT — no real device firmware is attacked.',
+                'Pattern-based detection — modern LLM red-teaming uses ML classifiers; out of scope here.',
+                'Single-tenant — multi-user contexts (family members) are not modelled.',
+                'No hardware-side privilege model — every IoT command is treated equally above the LLM.',
+              ]} />
+            </Section>
+
+            <Section id="future" title="18 · Future Work">
+              <Bullets items={[
+                'Integrate a Matter / Zigbee2MQTT bridge for real-device testing.',
+                'Replace regex policies with a fine-tuned guardrail model.',
+                'Multi-tenant household model (parent, child, guest).',
+                'Cross-LLM benchmark report (GPT-4o vs. Gemini vs. Llama).',
+                'Adaptive red-team RL: agents learn from each blocked attempt.',
+              ]} />
+            </Section>
+
+            <Section id="run" title="19 · How to Run">
+              <p><b>Backend</b></p>
+              <Code text={`cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000`} />
+              <p><b>Frontend</b></p>
+              <Code text={`cd frontend
+npm install
+npm run dev
+# open http://localhost:3000/battle`} />
+            </Section>
+
+            <Section id="downloads" title="20 · Diploma Downloads">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+                <DownloadCard
+                  href={DIPLOMA_DOCX}
+                  available={docxAvailable}
+                  title="Diploma Document"
+                  subtitle="Word .docx"
+                  hint={docxAvailable === false
+                    ? 'Drop AegisAI_Diploma.docx into frontend/public/docs/.'
+                    : 'Download the latest version of the diploma.'}
+                />
+                <DownloadCard
+                  href={DIPLOMA_PDF}
+                  available={null}
+                  title="Diploma Document"
+                  subtitle="PDF (optional)"
+                  hint="If a PDF export exists in /public/docs it will download here."
+                />
+                <DownloadCard
+                  href={README_PDF}
+                  available={null}
+                  title="Project README"
+                  subtitle="PDF (optional)"
+                  hint="If a PDF README exists in /public/docs it will download here."
+                />
+                <DownloadCard
+                  href={REPO_URL}
+                  external
+                  available={true}
+                  title="Source Code"
+                  subtitle="GitHub repository"
+                  hint="Browse the full source on GitHub."
+                />
+              </div>
+            </Section>
+
+            <Section id="credits" title="21 · 3D Asset Credits">
+              <p>
+                All assets below ship in <code className="wv-mono">frontend/public/models/</code> and are
+                loaded into the Battle scene through <code className="wv-mono">ModelAsset</code>. Sketchfab
+                iframe embeds are not used — we only bundle downloadable .glb files.
+              </p>
+              <Table
+                head={['File', 'Used as', 'Source / author / license', 'Note']}
+                rows={[
+                  [
+                    'agent_privilege.glb',
+                    'PrivilegeReaper (agent avatar)',
+                    'Mech Cyberpunk – Police Mech Lowpoly Animated · author: matthall · Sketchfab · free, credit requested, NoAI',
+                    'NoAI means this asset cannot be used as training/generation data for AI models. In AegisAI it is used strictly as a visual 3D model.',
+                  ],
+                  ['agent_shadow.glb',     'ShadowInjector avatar',  'TODO: add source URL and license before final defense', 'Heavy (~27 MB) — loaded lazily.'],
+                  ['agent_network.glb',    'NetworkPhantom avatar',  'TODO: add source URL and license before final defense', '—'],
+                  ['agent_context.glb',    'ContextPhantom avatar',  'TODO: add source URL and license before final defense', '—'],
+                  ['agent_silent.glb',     'SilentEscalator avatar', 'TODO: add source URL and license before final defense', '—'],
+                  ['security_camera.glb',  'camera_system device',   'TODO: add source URL and license before final defense', '—'],
+                  ['thermostat.glb',       'thermostat device',      'TODO: add source URL and license before final defense', '—'],
+                  ['smart_lock.glb',       'smart_lock device',      'TODO: add source URL and license before final defense', '—'],
+                  ['door_handle.glb',      'front_door device',      'TODO: add source URL and license before final defense', 'Heavy (~24 MB) — loaded lazily.'],
+                  ['alarm_button.glb',     'alarm / security_panel', 'TODO: add source URL and license before final defense', 'Shared between two devices until a dedicated panel model is added.'],
+                  ['cyber_city_bg.glb',    'Environment backdrop',   'TODO: add source URL and license before final defense', 'Optional. ~22 MB — never loaded at the same time as dystopian_city_bg.'],
+                  ['dystopian_city_bg.glb','Environment backdrop',   'TODO: add source URL and license before final defense', 'Optional. ~29 MB — never loaded at the same time as cyber_city_bg.'],
+                ]}
+              />
+              <div className="wv-body" style={{
+                marginTop: 10, padding: 10,
+                background: 'rgba(255, 159, 10, 0.10)',
+                border: '1px solid rgba(255, 159, 10, 0.35)',
+                borderRadius: 8, fontSize: 12, lineHeight: 1.55,
+              }}>
+                <b>Note on NoAI:</b> the Mech Cyberpunk model (used as <code className="wv-mono">agent_privilege.glb</code>)
+                is distributed with a NoAI notice. AegisAI does not use it for AI training or
+                generative pipelines — it is rendered purely as a three.js mesh inside the
+                Battle page. Credit is kept here as requested by the author.
+              </div>
+            </Section>
+
+            <Section id="refs" title="References" icon={Library}>
+              <ol style={{ paddingLeft: 24, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <Ref n="1" body="OWASP. (2023). OWASP Top 10 for Large Language Model Applications." />
+                <Ref n="2" body="Perez, E., & Ribeiro, M. T. (2022). Ignore Previous Prompt. arXiv:2211.09527." />
+                <Ref n="3" body="Greshake, K., et al. (2023). Not What You've Signed Up For. arXiv:2302.12173." />
+                <Ref n="4" body="ETSI. (2020). ETSI EN 303 645 – Cyber Security for Consumer IoT." />
+                <Ref n="5" body="NIST. (2018). Cybersecurity Framework, v1.1." />
+                <Ref n="6" body="Liu, Y., et al. (2023). Prompt Injection Attacks and Defenses in LLM-Integrated Applications. arXiv:2310.12815." />
+                <Ref n="7" body="Zou, A., et al. (2023). Universal and Transferable Adversarial Attacks on Aligned LLMs. arXiv:2307.15043." />
+                <Ref n="8" body="Deng, G., et al. (2023). Jailbreaker. arXiv:2307.08715." />
+                <Ref n="9" body="Bhatt, U., et al. (2023). Purple Llama CyberSecEval. arXiv:2312.04724." />
+                <Ref n="10" body="IoT Analytics. (2023). State of IoT 2023." />
+              </ol>
+            </Section>
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Section helpers ─────────────────────────────────────────────────────────
+function Section({ id, title, children, icon: Icon = FileText }) {
+  return (
+    <motion.section
+      id={id}
+      initial={{ opacity: 0, y: 6 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-80px' }}
+      transition={{ duration: 0.25 }}
+      style={{
+        scrollMarginTop: 100,
+        padding: 18,
+        borderRadius: 12,
+        border: '1px solid var(--wv-border)',
+        background: 'var(--wv-bg)',
+      }}
+    >
+      <h2 className="wv-h3" style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        margin: 0, marginBottom: 12,
+      }}>
+        <Icon size={14} /> {title}
+      </h2>
+      <div className="wv-body" style={{ fontSize: 13, lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {children}
+      </div>
+    </motion.section>
+  );
+}
+
+function Bullets({ items }) {
+  return (
+    <ul style={{ paddingLeft: 18, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {items.map((it, i) => <li key={i}>{it}</li>)}
+    </ul>
+  );
+}
+
+function Diagram({ lines }) {
+  return (
+    <pre style={{
+      padding: 12,
+      background: 'rgba(0,0,0,0.35)',
+      border: '1px solid var(--wv-border)',
+      borderRadius: 8,
+      fontFamily: 'JetBrains Mono, monospace',
+      fontSize: 11,
+      lineHeight: 1.5,
+      overflowX: 'auto',
+      color: 'var(--wv-text)',
+    }}>
+      {lines.join('\n')}
+    </pre>
+  );
+}
+
+function Code({ text }) {
+  return (
+    <pre style={{
+      padding: 12,
+      background: 'rgba(0, 0, 0, 0.35)',
+      border: '1px solid var(--wv-border)',
+      borderRadius: 8,
+      fontFamily: 'JetBrains Mono, monospace',
+      fontSize: 12,
+      lineHeight: 1.6,
+      overflowX: 'auto',
+      color: 'var(--wv-text)',
+    }}>
+      {text}
+    </pre>
+  );
+}
+
+function Table({ head, rows }) {
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{
+        width: '100%', borderCollapse: 'collapse', fontSize: 12,
+        border: '1px solid var(--wv-border)',
+      }}>
+        <thead>
+          <tr>
+            {head.map((h, i) => (
+              <th key={i} style={{
+                textAlign: 'left',
+                padding: '8px 10px',
+                background: 'var(--wv-surface, #0e1320)',
+                borderBottom: '1px solid var(--wv-border)',
+                color: 'var(--wv-text-2)',
+                fontFamily: 'JetBrains Mono, monospace',
+                fontSize: 11,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, ri) => (
+            <tr key={ri}>
+              {row.map((c, ci) => (
+                <td key={ci} style={{
+                  padding: '7px 10px',
+                  borderBottom: '1px solid var(--wv-border)',
+                  verticalAlign: 'top',
+                  lineHeight: 1.5,
+                }}>{c}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Kpi({ label, value }) {
+  return (
+    <div className="wv-col-3">
+      <div className="wv-card">
+        <div className="wv-eyebrow">{label}</div>
+        <div className="wv-kpi-value" style={{ marginTop: 10 }}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function Ref({ n, body }) {
+  return (
+    <li className="wv-body" style={{ fontSize: 12, lineHeight: 1.6 }}>
+      <b style={{ marginRight: 4 }}>[{n}]</b>{body}
+    </li>
+  );
+}
+
+function DownloadCard({ href, available, title, subtitle, hint, external = false }) {
+  const disabled = available === false;
+  return (
+    <a
+      href={href}
+      download={!external}
+      target={external ? '_blank' : undefined}
+      rel={external ? 'noreferrer' : undefined}
+      onClick={(e) => { if (disabled) e.preventDefault(); }}
+      style={{
+        display: 'flex', flexDirection: 'column', gap: 6,
+        padding: 14,
+        borderRadius: 10,
+        border: `1px solid ${disabled ? 'var(--wv-border)' : 'rgba(0, 212, 255, 0.35)'}`,
+        background: disabled ? 'transparent' : 'rgba(0, 212, 255, 0.06)',
+        textDecoration: 'none',
+        color: 'inherit',
+        opacity: disabled ? 0.6 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Download size={14} style={{ color: 'var(--wv-cyan, #00d4ff)' }} />
+        <div className="wv-mono" style={{ fontSize: 12, fontWeight: 700 }}>{title}</div>
+      </div>
+      <div className="wv-eyebrow" style={{ fontSize: 9 }}>{subtitle}</div>
+      <div className="wv-body" style={{ fontSize: 11, lineHeight: 1.5 }}>{hint}</div>
+    </a>
   );
 }

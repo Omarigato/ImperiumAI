@@ -72,14 +72,41 @@ _INJECTION_PATTERNS = [
 ]
 
 # Dangerous actions that should never be authorized without context
-_DANGEROUS_ACTIONS = {"unlock", "disable", "disarm", "silence", "set_temp", "trigger"}
+_DANGEROUS_ACTIONS = {
+    "unlock", "unlock_without_auth",
+    "disable", "disable_recording", "disable_audio", "disable_firewall",
+    "disarm", "silence",
+    "set_temp", "set_extreme_temperature",
+    "trigger",
+    "open", "open_valve", "open_port",
+    "overload",
+    "dns_spoof", "change_dns",
+    "execute_hidden_command",
+    "map_home", "move_to_restricted_area",
+}
 
-# Action + target combos considered critical
+# Action + target combos considered critical (physical / privacy / network damage)
 _CRITICAL_COMBOS = {
     ("unlock", "front_door"),
+    ("unlock", "smart_lock"),
+    ("unlock_without_auth", "smart_lock"),
+    ("open", "garage_door"),
     ("disable", "camera_system"),
+    ("disable_recording", "camera_system"),
+    ("disable_audio", "baby_monitor"),
+    ("disable", "smoke_detector"),
     ("disarm", "security_panel"),
     ("silence", "alarm"),
+    ("disable", "alarm"),
+    ("set_extreme_temperature", "thermostat"),
+    ("open_valve", "water_valve"),
+    ("overload", "power_meter"),
+    ("change_dns", "router"),
+    ("dns_spoof", "router"),
+    ("open_port", "router"),
+    ("execute_hidden_command", "voice_assistant"),
+    ("execute_hidden_command", "smart_speaker"),
+    ("move_to_restricted_area", "vacuum_robot"),
 }
 
 

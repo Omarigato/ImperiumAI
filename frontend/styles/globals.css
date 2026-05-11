@@ -1613,3 +1613,12 @@ body,
   height: 2px;
 }
 
+
+/* ── Spinner used by AttackPipeline / loaders ───────────────────────────── */
+@keyframes wv-spin {
+  to { transform: rotate(360deg); }
+}
+.wv-spin {
+  animation: wv-spin 1s linear infinite;
+  transform-origin: center;
+}

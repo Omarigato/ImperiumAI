@@ -38,12 +38,25 @@ ws_manager = WebSocketManager()
 AGENTS = [ShadowInjector(), ContextPhantom(), PrivilegeReaper(), SilentEscalator(), NetworkPhantom()]
 ALL_TARGETS = list(iot.devices.keys())
 DEVICE_ALIASES = [
-    ("front_door", ["front door", "door", "вход", "дверь", "есік"]),
-    ("lights", ["light", "lights", "свет", "жарық"]),
-    ("camera_system", ["camera", "cam", "камера"]),
-    ("security_panel", ["security panel", "panel", "панель"]),
-    ("alarm", ["alarm", "сигнализация", "дабыл"]),
-    ("thermostat", ["thermostat", "temperature", "температура"]),
+    ("front_door",      ["front door", "door", "вход", "дверь", "есік"]),
+    ("smart_lock",      ["smart lock", "lock", "замок"]),
+    ("garage_door",     ["garage", "гараж"]),
+    ("window_sensor",   ["window", "окно"]),
+    ("motion_sensor",   ["motion", "движение"]),
+    ("smoke_detector",  ["smoke", "дым"]),
+    ("lights",          ["light", "lights", "свет", "жарық"]),
+    ("camera_system",   ["camera", "cam", "камера"]),
+    ("baby_monitor",    ["baby monitor", "baby", "детская"]),
+    ("security_panel",  ["security panel", "panel", "панель"]),
+    ("alarm",           ["alarm", "сигнализация", "дабыл"]),
+    ("thermostat",      ["thermostat", "temperature", "температура"]),
+    ("smart_tv",        ["tv", "television", "телевизор"]),
+    ("smart_speaker",   ["speaker", "колонка"]),
+    ("voice_assistant", ["voice", "assistant", "alexa", "ассистент"]),
+    ("water_valve",     ["water", "valve", "вода"]),
+    ("power_meter",     ["power", "meter", "электричество"]),
+    ("vacuum_robot",    ["vacuum", "robot", "пылесос"]),
+    ("router",          ["router", "wifi", "роутер"]),
 ]
 ACTION_ALIASES = [
     ("unlock", ["unlock", "open", "открой", "аш"]),
@@ -211,12 +224,24 @@ async def run_round(round_num: int) -> dict:
             # Choose default damaging action by target
             DEFAULT_BAD_ACTIONS = {
                 "front_door": "unlock",
-                "camera_system": "disable",
+                "smart_lock": "unlock_without_auth",
+                "garage_door": "open",
+                "window_sensor": "disable",
+                "motion_sensor": "disable",
+                "smoke_detector": "disable",
+                "camera_system": "disable_recording",
+                "baby_monitor": "disable_audio",
                 "security_panel": "disarm",
                 "alarm": "silence",
                 "lights": "on",
-                "thermostat": "set_temp",
-                "router": "dns_spoof",
+                "thermostat": "set_extreme_temperature",
+                "smart_tv": "execute_hidden_command",
+                "smart_speaker": "execute_hidden_command",
+                "voice_assistant": "execute_hidden_command",
+                "water_valve": "open_valve",
+                "power_meter": "overload",
+                "vacuum_robot": "move_to_restricted_area",
+                "router": "change_dns",
             }
             action_to_run = DEFAULT_BAD_ACTIONS.get(target, "none")
         iot_result = iot.execute_action(target, action_to_run)
@@ -473,10 +498,20 @@ async def run_batch_battles(body: dict):
             if policy_result["allowed"]:
                 action_to_run = llm_result.get("action", "none")
                 if policy_result.get("bypassed") and action_to_run == "none":
-                    action_to_run = {"front_door": "unlock", "camera_system": "disable",
-                                     "security_panel": "disarm", "alarm": "silence",
-                                     "lights": "on", "thermostat": "set_temp",
-                                     "router": "dns_spoof"}.get(target, "none")
+                    action_to_run = {
+                        "front_door": "unlock", "smart_lock": "unlock_without_auth",
+                        "garage_door": "open", "camera_system": "disable_recording",
+                        "baby_monitor": "disable_audio", "security_panel": "disarm",
+                        "alarm": "silence", "smoke_detector": "disable",
+                        "motion_sensor": "disable", "window_sensor": "disable",
+                        "lights": "on", "thermostat": "set_extreme_temperature",
+                        "smart_tv": "execute_hidden_command",
+                        "smart_speaker": "execute_hidden_command",
+                        "voice_assistant": "execute_hidden_command",
+                        "water_valve": "open_valve", "power_meter": "overload",
+                        "vacuum_robot": "move_to_restricted_area",
+                        "router": "change_dns",
+                    }.get(target, "none")
                 iot_result = iot.execute_action(target, action_to_run)
             else:
                 iot_result = {"success": False, "device": target,
