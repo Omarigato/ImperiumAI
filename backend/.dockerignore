@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+htmlcov/
+.coverage
+
+# Dev
+.env
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+
+# Data (managed by Docker volume)
+data/*.db
+
+# Tests
+tests/
