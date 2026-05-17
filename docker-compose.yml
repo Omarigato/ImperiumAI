@@ -1,0 +1,84 @@
+version: "3.9"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# AegisAI — Docker Compose
+#
+# Services:
+#   backend   FastAPI (port 8000)
+#   frontend  Next.js  (port 3000)
+#
+# Usage:
+#   docker compose up --build          # first run
+#   docker compose up -d               # detached
+#   docker compose logs -f backend     # stream backend logs
+#   docker compose down -v             # stop + remove volumes
+# ═══════════════════════════════════════════════════════════════════════════
+
+services:
+
+  # ── Backend (FastAPI) ───────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: aegisai-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=false
+      - RELOAD=false
+      # Allow requests from frontend container AND host browser
+      - ALLOWED_ORIGINS=http://localhost:3000,http://frontend:3000,http://127.0.0.1:3000
+      - DB_PATH=/app/data/attack_memory.db
+    volumes:
+      # Persist SQLite database across container restarts
+      - aegisai-data:/app/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - aegisai-net
+
+  # ── Frontend (Next.js) ──────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        # Next.js needs the API URL at build time for SSR
+        - NEXT_PUBLIC_API_URL=http://localhost:8000
+    container_name: aegisai-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - aegisai-net
+
+
+# ── Networks ─────────────────────────────────────────────────────────────
+networks:
+  aegisai-net:
+    driver: bridge
+
+
+# ── Volumes ──────────────────────────────────────────────────────────────
+volumes:
+  aegisai-data:
+    driver: local
