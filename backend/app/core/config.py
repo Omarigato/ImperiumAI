@@ -26,12 +26,24 @@ class Settings(BaseSettings):
     reload: bool = False
 
     # ── CORS ────────────────────────────────────────────────────────────────
-    # Comma-separated list of allowed origins
+    # Comma-separated list of allowed origins (full URLs with scheme).
+    # Defaults to localhost so the API isn't open to the world before the
+    # operator has configured the deployment.
     allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+
+    # Optional Python regex that any *additional* origin is matched against.
+    # Useful for Render preview deployments, e.g.:
+    #   ALLOWED_ORIGIN_REGEX=^https://imperium-ai-frontend(-[a-z0-9]+)?\.onrender\.com$
+    allowed_origin_regex: str = Field(default="", alias="ALLOWED_ORIGIN_REGEX")
 
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    @property
+    def cors_origin_regex(self) -> str | None:
+        v = (self.allowed_origin_regex or "").strip()
+        return v or None
 
     # ── LLM API Keys (all optional — falls back to simulation) ──────────────
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")

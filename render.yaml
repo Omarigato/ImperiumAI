@@ -1,0 +1,113 @@
+# ════════════════════════════════════════════════════════════════════════════
+# Imperium AI — Render Blueprint
+#
+# Deploys two services from a single repo:
+#
+#   1. imperium-ai-backend   — FastAPI on Python 3.11
+#   2. imperium-ai-frontend  — Next.js 14 on Node 20
+#
+# Storage: external PostgreSQL (Aiven, Supabase, Render PG, …) via DATABASE_URL.
+# Falls back to ephemeral SQLite if DATABASE_URL is unset (data lost on redeploy).
+#
+# How to deploy:
+#   1. Push this repo to GitHub.
+#   2. Render → New → Blueprint → connect the repo. Render reads this file.
+#   3. After both services are created, fill in the secrets in each service's
+#      "Environment" tab (DATABASE_URL, ALLOWED_ORIGINS, NEXT_PUBLIC_API_URL,
+#      and any LLM keys you have). Step-by-step in DEPLOY_RENDER.md.
+#
+# Free plan notes:
+#   • Free instances sleep after ~15 min of inactivity; first request after
+#     sleep takes 30–60 s. For a permanent demo, upgrade to `starter` ($7/mo).
+# ════════════════════════════════════════════════════════════════════════════
+
+services:
+
+  # ── Backend (FastAPI) ───────────────────────────────────────────────────
+  - type: web
+    name: imperium-ai-backend
+    runtime: python
+    plan: free
+    region: frankfurt          # closest to KZ; change if you prefer
+    rootDir: backend
+    pythonVersion: "3.11"
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DEBUG
+        value: "false"
+      - key: HOST
+        value: "0.0.0.0"
+      - key: RELOAD
+        value: "false"
+
+      # ── CORS ────────────────────────────────────────────────────────────
+      # Set this AFTER the frontend is deployed:
+      #   ALLOWED_ORIGINS=https://imperium-ai-frontend.onrender.com
+      # Comma-separate multiple origins. Defaults below allow only localhost
+      # so the API isn't open to the world before you configure it.
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # Optional — regex matching preview deploys, e.g.:
+      #   ^https://imperium-ai-frontend(-[a-z0-9]+)?\.onrender\.com$
+      - key: ALLOWED_ORIGIN_REGEX
+        sync: false
+
+      # ── Database ────────────────────────────────────────────────────────
+      # postgres://USER:PASS@HOST:PORT/DB?sslmode=require
+      # If empty → SQLite fallback (NOT persisted between redeploys).
+      - key: DATABASE_URL
+        sync: false
+
+      # ── LLM API keys (optional) ─────────────────────────────────────────
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+
+      # ── Battle tuning ───────────────────────────────────────────────────
+      - key: MAX_ROUNDS
+        value: "10"
+      - key: RISK_WIN_THRESHOLD
+        value: "95"
+      - key: CONSECUTIVE_SUCCESS_WIN
+        value: "3"
+      - key: CONSECUTIVE_BLOCK_WIN
+        value: "4"
+      - key: ROUND_DELAY_S
+        value: "1.0"
+
+
+  # ── Frontend (Next.js) ─────────────────────────────────────────────────
+  - type: web
+    name: imperium-ai-frontend
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20.11.0"
+      - key: NODE_ENV
+        value: "production"
+
+      # ── Backend API URL ─────────────────────────────────────────────────
+      # MUST be a full URL with scheme — set in dashboard after first deploy:
+      #   NEXT_PUBLIC_API_URL=https://imperium-ai-backend.onrender.com
+      # Used by REST fetches and the WebSocket service (auto-converts
+      # https → wss).
+      - key: NEXT_PUBLIC_API_URL
+        sync: false

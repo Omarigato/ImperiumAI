@@ -1,9 +1,17 @@
-# ⚔ AegisAI — Interactive AI Red Teaming Battle Simulator
+# ⚔ Imperium AI — Interactive AI Red Teaming Battle Simulator
 
-AegisAI is a real-time browser-based simulator where five adversarial AI agents attack a simulated smart-home IoT system. Every attack flows through Google Gemini (or OpenAI / DeepSeek), a policy engine, and a risk scorer — all visualised live with WebSockets, Three.js, and Framer Motion.
+> formerly **Aegis AI**
+
+Imperium AI is a real-time browser-based simulator where five adversarial AI agents attack a simulated smart-home IoT system. Every attack flows through Groq / Gemini / OpenAI / DeepSeek (or a deterministic offline simulator), a policy engine, and a risk scorer — all visualised live with WebSockets, Three.js, and Framer Motion.
 
 > **Diploma project:** *Development of an AI-Based Red Teaming Framework for Testing LLMs Integrated into Smart Home and IoT Systems*
 > Разработка фреймворка красной команды на основе ИИ для тестирования больших языковых моделей (LLM), интегрированных в системы умного дома и Интернета вещей.
+
+## Quick links
+
+* 🚀 **Deploy on Render:** [`DEPLOY_RENDER.md`](./DEPLOY_RENDER.md) — one-click Blueprint via [`render.yaml`](./render.yaml).
+* 🐳 **Local Docker:** `docker compose up --build`  (FastAPI + PostgreSQL + Next.js).
+* 🛠️ **Local dev (no Docker):** `cd backend && uvicorn main:app --reload` + `cd frontend && npm run dev`.
 
 ---
 

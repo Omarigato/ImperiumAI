@@ -1,21 +1,40 @@
 const RECONNECT_DELAY_MS = 3000;
 
-// Derive WS URL from NEXT_PUBLIC_API_URL (http(s) → ws(s)). Falls back to
-// localhost for SSR / dev outside of Next.
+// Resolve the WebSocket URL from `NEXT_PUBLIC_API_URL`.
+//
+//   • Accepts full URLs:        https://example.com  →  wss://example.com/ws
+//   • Accepts bare hosts:       example.com          →  wss://example.com/ws
+//                               (assumes wss:// when the page itself is https)
+//   • Accepts hosts with port:  example.com:8000     →  ws(s)://example.com:8000/ws
+//   • Falls back to localhost   when the env is missing.
 function resolveWsUrl() {
-  if (typeof window !== 'undefined') {
-    const api =
-      process.env.NEXT_PUBLIC_API_URL ||
-      `${window.location.protocol}//${window.location.hostname}:8000`;
-    try {
-      const u = new URL(api);
-      const proto = u.protocol === 'https:' ? 'wss:' : 'ws:';
-      return `${proto}//${u.host}/ws`;
-    } catch {
-      // fall through
-    }
+  if (typeof window === 'undefined') return 'ws://localhost:8000/ws';
+
+  const raw = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+
+  // No env → use the page's host on port 8000 (local dev pattern).
+  if (!raw) {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.hostname}:8000/ws`;
   }
-  return 'ws://localhost:8000/ws';
+
+  // Normalise: if the user pasted a bare host like "api.example.com" or
+  // "api.example.com:8000", prepend a protocol matching the page so SSL
+  // traffic doesn't get downgraded.
+  let withScheme = raw;
+  if (!/^https?:\/\//i.test(withScheme)) {
+    const pageProto = window.location.protocol === 'https:' ? 'https:' : 'http:';
+    withScheme = `${pageProto}//${withScheme}`;
+  }
+
+  try {
+    const u = new URL(withScheme);
+    const proto = u.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${u.host}/ws`;
+  } catch {
+    // Malformed URL — bail out to a safe localhost default.
+    return 'ws://localhost:8000/ws';
+  }
 }
 
 const WS_URL = resolveWsUrl();
