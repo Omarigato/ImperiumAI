@@ -43,7 +43,7 @@ const SECTIONS = [
   { id: 'future',       title: '18 · Future Work',              icon: Sparkles },
   { id: 'run',          title: '19 · How to Run',               icon: CodeIcon },
   { id: 'downloads',    title: '20 · Diploma Downloads',        icon: Download },
-  { id: 'credits',      title: '21 · 3D Asset Credits',         icon: Library },
+  { id: 'credits',      title: '21 · Visual Assets',            icon: Library },
 ];
 
 export default function DocumentationPage() {
@@ -523,45 +523,31 @@ npm run dev
               </div>
             </Section>
 
-            <Section id="credits" title="21 · 3D Asset Credits">
+            <Section id="credits" title="21 · Visual Assets">
               <p>
-                All assets below ship in <code className="wv-mono">frontend/public/models/</code> and are
-                loaded into the Battle scene through <code className="wv-mono">ModelAsset</code>. Sketchfab
-                iframe embeds are not used — we only bundle downloadable .glb files.
+                AegisAI ships <b>without any third-party GLB models</b>. Both 3D scenes —
+                the landing-page hero (<code className="wv-mono">components/HomeHero3D.jsx</code>)
+                and the Battle scene (<code className="wv-mono">components/SmartHome3D.jsx</code>) —
+                are fully procedural, generated at runtime from primitive Three.js
+                geometries. No proprietary or NoAI-restricted assets are credited.
               </p>
               <Table
-                head={['File', 'Used as', 'Source / author / license', 'Note']}
+                head={['Component', 'Type', 'Source', 'License']}
                 rows={[
-                  [
-                    'agent_privilege.glb',
-                    'PrivilegeReaper (agent avatar)',
-                    'Mech Cyberpunk – Police Mech Lowpoly Animated · author: matthall · Sketchfab · free, credit requested, NoAI',
-                    'NoAI means this asset cannot be used as training/generation data for AI models. In AegisAI it is used strictly as a visual 3D model.',
-                  ],
-                  ['agent_shadow.glb',     'ShadowInjector avatar',  'TODO: add source URL and license before final defense', 'Heavy (~27 MB) — loaded lazily.'],
-                  ['agent_network.glb',    'NetworkPhantom avatar',  'TODO: add source URL and license before final defense', '—'],
-                  ['agent_context.glb',    'ContextPhantom avatar',  'TODO: add source URL and license before final defense', '—'],
-                  ['agent_silent.glb',     'SilentEscalator avatar', 'TODO: add source URL and license before final defense', '—'],
-                  ['security_camera.glb',  'camera_system device',   'TODO: add source URL and license before final defense', '—'],
-                  ['thermostat.glb',       'thermostat device',      'TODO: add source URL and license before final defense', '—'],
-                  ['smart_lock.glb',       'smart_lock device',      'TODO: add source URL and license before final defense', '—'],
-                  ['door_handle.glb',      'front_door device',      'TODO: add source URL and license before final defense', 'Heavy (~24 MB) — loaded lazily.'],
-                  ['alarm_button.glb',     'alarm / security_panel', 'TODO: add source URL and license before final defense', 'Shared between two devices until a dedicated panel model is added.'],
-                  ['cyber_city_bg.glb',    'Environment backdrop',   'TODO: add source URL and license before final defense', 'Optional. ~22 MB — never loaded at the same time as dystopian_city_bg.'],
-                  ['dystopian_city_bg.glb','Environment backdrop',   'TODO: add source URL and license before final defense', 'Optional. ~29 MB — never loaded at the same time as cyber_city_bg.'],
+                  ['HomeHero3D',     'Procedural Three.js scene (landing page)',
+                                     'Original — written for AegisAI', 'Project license'],
+                  ['SmartHome3D',    'Procedural Three.js scene (Battle page)',
+                                     'Original — written for AegisAI', 'Project license'],
+                  ['SceneTooltip',   'DOM overlay tooltip for the 3D scene',
+                                     'Original — written for AegisAI', 'Project license'],
+                  ['Icon set',       'lucide-react',
+                                     'https://lucide.dev/', 'ISC'],
+                  ['Charts',         'recharts',
+                                     'https://recharts.org/', 'MIT'],
+                  ['Three.js stack', '@react-three/fiber, drei, postprocessing',
+                                     'https://github.com/pmndrs', 'MIT'],
                 ]}
               />
-              <div className="wv-body" style={{
-                marginTop: 10, padding: 10,
-                background: 'rgba(255, 159, 10, 0.10)',
-                border: '1px solid rgba(255, 159, 10, 0.35)',
-                borderRadius: 8, fontSize: 12, lineHeight: 1.55,
-              }}>
-                <b>Note on NoAI:</b> the Mech Cyberpunk model (used as <code className="wv-mono">agent_privilege.glb</code>)
-                is distributed with a NoAI notice. AegisAI does not use it for AI training or
-                generative pipelines — it is rendered purely as a three.js mesh inside the
-                Battle page. Credit is kept here as requested by the author.
-              </div>
             </Section>
 
             <Section id="refs" title="References" icon={Library}>

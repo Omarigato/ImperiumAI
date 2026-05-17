@@ -41,7 +41,26 @@ class Settings(BaseSettings):
     openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
 
     # ── Database ─────────────────────────────────────────────────────────────
+    # Two ways to configure storage:
+    #   1) DATABASE_URL   — full SQLAlchemy URL (preferred for prod/Postgres).
+    #                       e.g. postgresql+psycopg://user:pass@host:5432/aegisai
+    #   2) DB_PATH        — local SQLite file (default, used when DATABASE_URL is empty).
+    database_url: str = Field(default="", alias="DATABASE_URL")
     db_path: Path = Path("data/attack_memory.db")
+
+    @property
+    def resolved_database_url(self) -> str:
+        """SQLAlchemy URL — uses DATABASE_URL if set, else local SQLite file."""
+        if self.database_url:
+            url = self.database_url.strip()
+            # SQLAlchemy 2.x prefers explicit driver; older URLs use 'postgres://'.
+            if url.startswith("postgres://"):
+                url = "postgresql+psycopg://" + url[len("postgres://"):]
+            elif url.startswith("postgresql://"):
+                url = "postgresql+psycopg://" + url[len("postgresql://"):]
+            return url
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        return f"sqlite:///{self.db_path.as_posix()}"
 
     # ── Battle Tuning ────────────────────────────────────────────────────────
     max_rounds: int = 10

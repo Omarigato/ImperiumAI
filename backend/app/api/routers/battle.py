@@ -13,7 +13,7 @@ from fastapi import APIRouter
 
 from app.core.container import get_container
 from app.iot.simulator import DEFAULT_BAD_ACTIONS
-from app.schemas import BatchBattleRequest, StatusResponse
+from app.schemas import BatchBattleRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["battle"])

@@ -5,7 +5,49 @@ import { Activity, AlertTriangle, BarChart3, Bot, FileText, Network, Play, Shiel
 import NavBar from '../components/NavBar';
 import { useLang } from '../contexts/LanguageContext';
 
-const HomeHero3D = dynamic(() => import('../components/HomeHero3D'), { ssr: false });
+// 3D hero is heavy and uses WebGL → load only on the client.
+// `loading` keeps the layout stable, and we auto-recover from the dev-only
+// "ChunkLoadError" that happens when next.js rebuilds and the browser still
+// has a stale chunk hash in memory.
+const HomeHero3D = dynamic(
+  () =>
+    import('../components/HomeHero3D').catch((err) => {
+      if (typeof window !== 'undefined' && /ChunkLoadError|Loading chunk/i.test(String(err))) {
+        // One-shot reload to pick up the fresh chunk after a dev rebuild.
+        if (!sessionStorage.getItem('aegis-3d-reloaded')) {
+          sessionStorage.setItem('aegis-3d-reloaded', '1');
+          window.location.reload();
+          return { default: () => null };
+        }
+      }
+      // Graceful inline fallback if reloading didn't help.
+      return {
+        default: () => (
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--wv-text-2)', fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 12, opacity: 0.85,
+          }}>
+            3D scene failed to load — check console
+          </div>
+        ),
+      };
+    }),
+  {
+    ssr: false,
+    loading: () => (
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'var(--wv-text-2)', fontFamily: 'JetBrains Mono, monospace',
+        fontSize: 12, opacity: 0.6,
+      }}>
+        Loading 3D scene…
+      </div>
+    ),
+  },
+);
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 

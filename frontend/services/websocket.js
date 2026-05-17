@@ -1,5 +1,24 @@
 const RECONNECT_DELAY_MS = 3000;
-const WS_URL = 'ws://localhost:8000/ws';
+
+// Derive WS URL from NEXT_PUBLIC_API_URL (http(s) → ws(s)). Falls back to
+// localhost for SSR / dev outside of Next.
+function resolveWsUrl() {
+  if (typeof window !== 'undefined') {
+    const api =
+      process.env.NEXT_PUBLIC_API_URL ||
+      `${window.location.protocol}//${window.location.hostname}:8000`;
+    try {
+      const u = new URL(api);
+      const proto = u.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${proto}//${u.host}/ws`;
+    } catch {
+      // fall through
+    }
+  }
+  return 'ws://localhost:8000/ws';
+}
+
+const WS_URL = resolveWsUrl();
 
 class WebSocketService {
   constructor() {

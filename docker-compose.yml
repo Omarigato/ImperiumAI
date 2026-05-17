@@ -33,12 +33,20 @@ services:
       - RELOAD=false
       # Allow requests from frontend container AND host browser
       - ALLOWED_ORIGINS=http://localhost:3000,http://frontend:3000,http://127.0.0.1:3000
+      # Default storage:
+      #   • DATABASE_URL points at the local `db` service (Postgres).
+      #   • DB_PATH is a SQLite fallback (used only if DATABASE_URL is unset).
+      # Override either by editing ./backend/.env.
+      - DATABASE_URL=postgresql+psycopg://aegisai:aegisai@db:5432/aegisai
       - DB_PATH=/app/data/attack_memory.db
     volumes:
-      # Persist SQLite database across container restarts
+      # Persist SQLite fallback across container restarts
       - aegisai-data:/app/data
     ports:
       - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -46,6 +54,28 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+    networks:
+      - aegisai-net
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: aegisai-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=aegisai
+      - POSTGRES_PASSWORD=aegisai
+      - POSTGRES_DB=aegisai
+    volumes:
+      - aegisai-pg:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegisai -d aegisai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - aegisai-net
 
@@ -81,4 +111,6 @@ networks:
 # ── Volumes ──────────────────────────────────────────────────────────────
 volumes:
   aegisai-data:
+    driver: local
+  aegisai-pg:
     driver: local

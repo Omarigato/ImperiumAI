@@ -7,6 +7,7 @@ from fastapi import APIRouter
 
 from app.api.routers.battle import _state
 from app.core.container import get_container
+from app.scoring.risk_engine import level_for
 
 router = APIRouter(prefix="/api/defense", tags=["defense"])
 
@@ -33,15 +34,13 @@ async def reset_risk() -> dict:
         return {"status": "not_running", "message": "No battle in progress"}
     c = get_container()
     old = c.risk.get_score()
-    c.risk._score = max(0, c.risk._score - 20)
+    delta = c.risk.reduce_score(20)
     new = c.risk.get_score()
-    delta = new - old
-    level = "safe" if new <= 30 else "elevated" if new <= 60 else "critical"
     await c.ws_manager.broadcast({
         "event": "risk_update",
         "score": new,
         "delta": delta,
-        "level": level,
+        "level": level_for(new),
         "message": f"Emergency countermeasures deployed — risk reduced by {abs(delta)}",
     })
     await c.ws_manager.emit_log("Defense", f"🔄 COUNTERMEASURES — risk ↓ {abs(delta)} pts", "warning")

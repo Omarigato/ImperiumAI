@@ -1,748 +1,539 @@
 /**
- * SmartHome3D — Cinematic 3D battle visualization (v4 · clean labels).
+ * SmartHome3D — procedural Three.js scene used by the Battle page.
  *
- * Aesthetic preserved (cyberpunk "Hollywood-hacker" mission control):
- *   • Reflective wet-look floor (MeshReflectorMaterial)
- *   • Holographic translucent house (HolographicMaterial)
- *   • Crystal-orb / .glb agent avatars
- *   • Floating data nodes (devices) with status colours
- *   • Glitch postprocessing on breach
- *   • Bloom + Vignette cinematic look
+ * Zero GLB assets: every device, every agent and the house itself is built
+ * from primitive geometries inside react-three-fiber. The component is
+ * fully driven by the props streamed from the WebSocket battle pipeline:
  *
- * v4 (presentation cleanup):
- *   • NO permanent text labels in the scene.
- *   • Labels (small, 1–2 lines) only show when:
- *       - hoveredObjectId === id
- *       - selectedObjectId === id
- *       - activeAttack.agentId === id  or  activeAttack.target === id
- *       - showDebugLabels === true
- *   • All long explanations live in the right-side tabs, NOT in the canvas.
- *   • Optional .glb models loaded via ModelAsset with graceful fallback.
- *   • Scene visibility toggles: showLabels / showAttackBeams /
- *     showStatusIcons / showDebugGrid / performanceMode.
+ *   • deviceStates       — current backend status of each device
+ *   • activeAttack       — currently-attacking agent + target + tactic
+ *   • defendedTargets    — devices that just blocked an attack
+ *   • agentStatuses      — IDLE / CHARGING / ATTACKING / BREACH / BLOCKED
+ *   • shieldActive       — global defense shield
+ *   • onHover / onSelect — UI callbacks (kind: 'device' | 'agent')
+ *   • hoveredObjectId / selectedObjectId — sync with overlay tooltip
  */
-import { useRef, useMemo, useEffect, useState, memo, useCallback } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, MeshReflectorMaterial, RoundedBox, Float, Html } from '@react-three/drei';
-import { EffectComposer, Bloom, Vignette, Glitch } from '@react-three/postprocessing';
-import { GlitchMode } from 'postprocessing';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
-import AttackEffectRouter from './AttackEffects';
-import HolographicMaterial from './HolographicMaterial';
-import ModelAsset from './ModelAsset';
-import { DEVICES, DEVICE_INDEX } from './meta/devices';
-import {
-  DEVICE_MODEL_KEYS, AGENT_MODEL_KEYS, MODEL_REGISTRY, ENVIRONMENT_KEYS, getModelEntry,
-} from '../lib/modelRegistry';
+import { useMemo, useRef, useState, memo, useEffect } from 'react';
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-// Positions spread out around the house so GLB agent avatars never overlap.
-const AGENT_HOME_POSITIONS = {
-  ShadowInjector:   [-5.0, 0, -2.0],
-  ContextPhantom:   [-4.0, 0,  1.0],
-  PrivilegeReaper:  [-5.0, 0,  3.0],
-  SilentEscalator:  [-3.0, 0, -4.0],
-  NetworkPhantom:   [-2.0, 0,  4.0],
+import { DEVICES, getDevice } from './meta/devices';
+import { AGENTS as AGENT_META } from './meta/agents';
+
+// ── Layout constants ────────────────────────────────────────────────────────
+const RADIUS = 6.5;
+const HOUSE_RADIUS = 3.0;
+
+const AGENT_ANGLES = {
+  ShadowInjector:  (0 * Math.PI) / 2.5,
+  ContextPhantom:  (1 * Math.PI) / 2.5,
+  PrivilegeReaper: (2 * Math.PI) / 2.5,
+  SilentEscalator: (3 * Math.PI) / 2.5,
+  NetworkPhantom:  (4 * Math.PI) / 2.5,
 };
 
-const AGENT_COLORS = {
-  ShadowInjector:  '#ff3b6b',
-  ContextPhantom:  '#a855f7',
-  PrivilegeReaper: '#ff8a2a',
-  SilentEscalator: '#00d4ff',
-  NetworkPhantom:  '#10ffac',
+// Status colour palette (mirrors SmartHomeBoard.statusTone but for 3D).
+const STATUS_COLORS = {
+  safe:   '#10ffac',
+  warn:   '#ff9f0a',
+  breach: '#ff3b6b',
+  idle:   '#5b6678',
 };
 
-// House-mounted positions (the original layout from meta/devices.js)
-const HOUSE_MOUNTED_POSITIONS = Object.fromEntries(DEVICES.map((d) => [d.id, d.position3D]));
-
-// Exploded layout — every device on the ground around the house so all .glb
-// models can be seen at full size during the diploma demo.
-const EXPLODED_POSITIONS = {
-  // Front yard (south, +Z) — facing camera
-  front_door:      [-1.5, 0,  4.5],
-  smart_lock:      [ 0.6, 0,  4.5],
-  garage_door:     [-4.2, 0,  4.5],
-  vacuum_robot:    [ 3.0, 0,  4.5],
-  smart_light:     [ 0.0, 0.1, 6.0],
-  lights:          [ 0.0, 0.1, 6.0],
-  // East side (+X)
-  camera_system:   [ 5.0, 0,  3.0],
-  thermostat:      [ 5.0, 0,  1.0],
-  security_panel:  [ 5.0, 0, -1.0],
-  alarm:           [ 5.0, 0, -3.0],
-  baby_monitor:    [ 5.0, 0, -5.0],
-  // Back yard (-Z)
-  smoke_detector:  [ 2.0, 0, -6.0],
-  motion_sensor:   [ 0.0, 0, -6.5],
-  window_sensor:   [-2.0, 0, -6.0],
-  water_valve:     [ 3.5, 0, -6.5],
-  power_meter:     [-4.0, 0, -6.5],
-  // Inside (raised, visible through the holographic walls)
-  voice_assistant: [ 0.0, 0.0, -0.5],
-  smart_speaker:   [ 1.4, 0.0, -1.5],
-  smart_tv:        [-1.8, 0.0, -1.8],
-  // Far back east — router as the network gateway
-  router:          [ 6.0, 0, -6.0],
-};
-
-// Pick positions based on layout mode.
-function getDevicePosition(deviceId, layout) {
-  if (layout === 'house-mounted') return HOUSE_MOUNTED_POSITIONS[deviceId];
-  return EXPLODED_POSITIONS[deviceId] || HOUSE_MOUNTED_POSITIONS[deviceId];
+function statusTone(status) {
+  if (!status) return 'idle';
+  const s = String(status).toLowerCase();
+  if (['compromised', 'dns_poisoned', 'unlocked', 'disabled', 'disarmed',
+       'overridden', 'critical', 'open', 'overloaded', 'flooding',
+       'triggered'].includes(s)) return 'breach';
+  if (['active', 'armed', 'locked', 'closed', 'secure', 'normal',
+       'listening', 'on', 'standby', 'idle', 'docked', 'playing',
+       'inactive'].includes(s)) return 'safe';
+  return 'warn';
 }
 
-// Back-compat: a flat default map used by AgentFigure / beam calcs.
-// Defaults to EXPLODED layout, which is what the page renders by default.
-const DEVICE_POSITIONS = { ...HOUSE_MOUNTED_POSITIONS, ...EXPLODED_POSITIONS };
-
-// ── Compact label (only rendered when explicitly needed) ─────────────────────
-function MiniLabel({ position, color, children }) {
-  return (
-    <Html
-      center
-      distanceFactor={9}
-      occlude
-      position={position}
-      style={{ pointerEvents: 'none' }}
-    >
-      <div style={{
-        padding: '2px 6px',
-        fontFamily: 'JetBrains Mono, monospace',
-        fontSize: 9,
-        fontWeight: 700,
-        color,
-        background: 'rgba(0, 0, 0, 0.7)',
-        border: `1px solid ${color}66`,
-        borderRadius: 3,
-        whiteSpace: 'nowrap',
-        textTransform: 'uppercase',
-        letterSpacing: '0.05em',
-        userSelect: 'none',
-      }}>
-        {children}
-      </div>
-    </Html>
-  );
-}
-
-// ── Reflective floor ─────────────────────────────────────────────────────────
-const Floor = memo(function Floor({ showDebugGrid }) {
-  return (
-    <>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[80, 80]} />
-        <MeshReflectorMaterial
-          blur={[300, 80]}
-          resolution={512}
-          mixBlur={1}
-          mixStrength={42}
-          roughness={0.85}
-          depthScale={1.2}
-          minDepthThreshold={0.4}
-          maxDepthThreshold={1.4}
-          color="#0c1226"
-          metalness={0.6}
-          mirror={0.3}
-        />
-      </mesh>
-      {showDebugGrid && (
-        <gridHelper args={[40, 40, '#00d4ff', '#1a2240']} position={[0, 0.01, 0]} />
-      )}
-    </>
-  );
-});
-
-// ── Holographic house ─────────────────────────────────────────────────────────
+// ── Holographic house (cribbed from HomeHero3D, slightly bigger) ────────────
 const HolographicHouse = memo(function HolographicHouse() {
   return (
     <group>
       <mesh position={[0, 0.05, 0]} receiveShadow>
-        <boxGeometry args={[6.4, 0.1, 5.4]} />
+        <boxGeometry args={[5.6, 0.1, 4.8]} />
         <meshStandardMaterial color="#0d1428" metalness={0.7} roughness={0.3} />
       </mesh>
       <mesh position={[0, 0.11, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[3.6, 3.85, 64]} />
-        <meshBasicMaterial color="#00d4ff" transparent opacity={0.6} side={THREE.DoubleSide} />
+        <ringGeometry args={[3.15, 3.35, 64]} />
+        <meshBasicMaterial color="#00d4ff" transparent opacity={0.55} side={THREE.DoubleSide} />
       </mesh>
-      <RoundedBox args={[5, 2.4, 4]} radius={0.08} smoothness={4} position={[0, 1.3, 0]}>
-        <HolographicMaterial color="#5cc8ff" brightness={1.4} scanlineSize={12} fresnelAmount={0.6} />
+
+      <RoundedBox args={[4.4, 2.1, 3.6]} radius={0.07} smoothness={4} position={[0, 1.15, 0]}>
+        <meshStandardMaterial
+          color="#5cc8ff"
+          emissive="#00d4ff"
+          emissiveIntensity={0.32}
+          metalness={0.5}
+          roughness={0.25}
+          transparent
+          opacity={0.42}
+        />
       </RoundedBox>
-      <mesh position={[0, 3.0, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
-        <coneGeometry args={[3.3, 1.4, 4]} />
-        <meshStandardMaterial color="#1a2240" emissive="#1a2240" metalness={0.6} roughness={0.4} />
+
+      <mesh position={[0, 2.7, 0]} rotation={[0, Math.PI / 4, 0]} castShadow>
+        <coneGeometry args={[2.95, 1.2, 4]} />
+        <meshStandardMaterial color="#1a2240" metalness={0.6} roughness={0.4} />
       </mesh>
-      <mesh position={[0, 2.51, 0]}>
-        <torusGeometry args={[3.3, 0.04, 8, 4]} />
+      <mesh position={[0, 2.3, 0]}>
+        <torusGeometry args={[2.95, 0.04, 8, 4]} />
         <meshBasicMaterial color="#00d4ff" />
-      </mesh>
-      {[-1.5, 1.5].map((x) => (
-        <group key={x} position={[x, 1.45, 2.02]}>
-          <mesh>
-            <boxGeometry args={[0.95, 0.85, 0.05]} />
-            <meshStandardMaterial color="#0a1428" emissive="#a855f7" emissiveIntensity={0.4} />
-          </mesh>
-          <mesh position={[0, 0, 0.03]}>
-            <planeGeometry args={[0.82, 0.7]} />
-            <meshBasicMaterial color="#a855f7" transparent opacity={0.35} />
-          </mesh>
-        </group>
-      ))}
-      {[-1.2, 1.2].map((z) => (
-        <mesh key={z} position={[2.52, 1.4, z]} rotation={[0, Math.PI / 2, 0]}>
-          <planeGeometry args={[0.7, 0.6]} />
-          <meshBasicMaterial color="#10ffac" transparent opacity={0.4} side={THREE.DoubleSide} />
-        </mesh>
-      ))}
-      <mesh position={[1.2, 4.0, -0.6]}>
-        <cylinderGeometry args={[0.02, 0.02, 1.2, 6]} />
-        <meshStandardMaterial color="#888" metalness={0.9} />
-      </mesh>
-      <mesh position={[1.2, 4.65, -0.6]}>
-        <sphereGeometry args={[0.07, 12, 12]} />
-        <meshStandardMaterial color="#ff3b6b" emissive="#ff3b6b" emissiveIntensity={1.2} />
       </mesh>
     </group>
   );
 });
 
-// ── .glb / fallback avatar agent ─────────────────────────────────────────────
-// Ground-positioned group. The avatar stands on the floor; a small status
-// orb + rings bob above its head.
-function AgentFigure({
-  name, isActive, activeAttack, status,
-  showLabel, isHovered, isSelected,
-  onPointerOver, onPointerOut, onClick,
-  debug,
-}) {
-  const groupRef = useRef();     // root group – drives XZ movement on the ground
-  const crownRef = useRef();     // status orb + rings above the head
-  const orbRef   = useRef();
-  const ring1Ref = useRef();
-  const ring2Ref = useRef();
-
-  const colorHex = AGENT_COLORS[name] || '#ff3b6b';
-  const homePos = AGENT_HOME_POSITIONS[name] || [-5, 0, 0];
-  const modelKey = AGENT_MODEL_KEYS[name];
-
-  const targetPos = useMemo(() => {
-    if (isActive && activeAttack?.target && DEVICE_POSITIONS[activeAttack.target]) {
-      const dp = DEVICE_POSITIONS[activeAttack.target];
-      // stand ~2.2 units away from the targeted device, still on the ground
-      return [dp[0] - 2.2, 0, dp[2]];
-    }
-    return homePos;
-  }, [isActive, activeAttack?.target, homePos]);
-
-  const posRef = useRef(new THREE.Vector3(...homePos));
-  const lookVecRef = useRef(new THREE.Vector3());
-
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    if (!groupRef.current) return;
-    // XZ movement on the ground
-    posRef.current.x += (targetPos[0] - posRef.current.x) * 0.05;
-    posRef.current.z += (targetPos[2] - posRef.current.z) * 0.05;
-    groupRef.current.position.set(posRef.current.x, 0, posRef.current.z);
-
-    // Face the target during an attack
-    if (isActive && activeAttack?.target && DEVICE_POSITIONS[activeAttack.target]) {
-      const dp = DEVICE_POSITIONS[activeAttack.target];
-      lookVecRef.current.set(dp[0], 0, dp[2]);
-      groupRef.current.lookAt(lookVecRef.current);
-    } else {
-      groupRef.current.rotation.y += 0.003;
-    }
-
-    // Floating crown (orb + rings) above head
-    if (crownRef.current) {
-      crownRef.current.position.y = 2.0 + Math.sin(t * 1.6 + name.length) * 0.14;
-    }
-    if (orbRef.current) {
-      orbRef.current.rotation.y = t * 1.2;
-      orbRef.current.rotation.x = t * 0.6;
-      const sc = isActive ? 1 + Math.sin(t * 8) * 0.08 : 1;
-      orbRef.current.scale.setScalar(sc);
-    }
-    if (ring1Ref.current) ring1Ref.current.rotation.z = t * 0.8;
-    if (ring2Ref.current) ring2Ref.current.rotation.x = t * 1.1;
-  });
-
-  const ringScale = isHovered || isSelected ? 1.18 : 1;
-
+// ── Reflective floor ────────────────────────────────────────────────────────
+const ReflectiveGround = memo(function ReflectiveGround() {
   return (
-    <group ref={groupRef}>
-      {/* Ground aura */}
-      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.55, 0.75, 24]} />
-        <meshBasicMaterial color={colorHex} transparent
-          opacity={isActive ? 0.35 : isHovered || isSelected ? 0.25 : 0.12}
-          depthWrite={false} />
-      </mesh>
-
-      {/* Avatar (.glb via ModelAsset) – falls back to procedural primitive */}
-      <ModelAsset
-        modelKey={modelKey}
-        fallback={modelKey ? undefined : 'humanoid'}
-        tint={colorHex}
-        position={[0, 0, 0]}
-        isActive={isActive}
-        isBreached={status === 'BREACH'}
-        isProtected={status === 'BLOCKED'}
-        debug={debug}
-        onPointerOver={onPointerOver}
-        onPointerOut={onPointerOut}
-        onClick={onClick}
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+      <planeGeometry args={[80, 80]} />
+      <MeshReflectorMaterial
+        blur={[300, 80]}
+        resolution={384}
+        mixBlur={1}
+        mixStrength={32}
+        roughness={0.9}
+        depthScale={1.1}
+        minDepthThreshold={0.4}
+        maxDepthThreshold={1.4}
+        color="#04060e"
+        metalness={0.5}
+        mirror={0.25}
       />
-
-      {/* Status crown above the head */}
-      <group ref={crownRef}>
-        <mesh ref={orbRef} castShadow>
-          <icosahedronGeometry args={[0.18, 0]} />
-          <meshStandardMaterial
-            color={colorHex} emissive={colorHex}
-            emissiveIntensity={isActive ? 1.6 : isHovered ? 1.2 : 0.9}
-            metalness={0.9} roughness={0.15}
-            transparent opacity={0.95}
-          />
-        </mesh>
-        <mesh ref={ring1Ref} scale={ringScale}>
-          <torusGeometry args={[0.32, 0.015, 6, 20]} />
-          <meshBasicMaterial color={colorHex} transparent opacity={0.7} />
-        </mesh>
-        <mesh ref={ring2Ref} scale={ringScale}>
-          <torusGeometry args={[0.26, 0.01, 6, 20]} />
-          <meshBasicMaterial color={colorHex} transparent opacity={0.5} />
-        </mesh>
-      </group>
-
-      <pointLight position={[0, 1.4, 0]} color={colorHex}
-        intensity={isActive ? 3.2 : isHovered ? 2.0 : 1.3} distance={5} decay={2} />
-
-      {/* Compact label — only when needed */}
-      {showLabel && (
-        <MiniLabel position={[0, 2.55, 0]} color={colorHex}>
-          {name}
-          {status && status !== 'IDLE' ? ` · ${status}` : ''}
-        </MiniLabel>
-      )}
-    </group>
+    </mesh>
   );
-}
+});
 
-// ── Device node — renders a .glb (or fallback) + status ring ────────────────
-function DeviceNode({
-  deviceId, compromised, defended, targeted,
-  showLabel, isHovered, isSelected,
-  onPointerOver, onPointerOut, onClick,
-  showStatusIcons,
-  layout,
-  debug,
-}) {
-  const ringRef = useRef();
-  const corePos = getDevicePosition(deviceId, layout);
-  if (!corePos) return null;
-  const meta = DEVICE_INDEX[deviceId];
-  const baseColor = compromised ? '#ff3b6b' : defended ? '#10ffac' : (meta?.color || '#00d4ff');
-  const labelColor = compromised ? '#ff3b6b' : defended ? '#10ffac' : targeted ? '#ffd60a' : meta?.color;
-  const modelKey = DEVICE_MODEL_KEYS[deviceId];
-
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    if (ringRef.current) {
-      ringRef.current.rotation.z = t * (compromised ? 4 : targeted ? 2.4 : 1.4);
-      const op = compromised ? 0.85 : defended ? 0.7 : targeted ? 0.7 : isHovered ? 0.6 : 0.3;
-      ringRef.current.material.opacity = op + Math.sin(t * 5) * 0.1;
-    }
-  });
-
-  const halo = isSelected || isHovered;
-
-  return (
-    <group
-      position={corePos}
-      onPointerOver={(e) => { e.stopPropagation(); onPointerOver?.(e); }}
-      onPointerOut={onPointerOut}
-      onClick={(e) => { e.stopPropagation(); onClick?.(e); }}
-    >
-      {/* .glb model with fallback primitive — never breaks */}
-      <ModelAsset
-        modelKey={modelKey}
-        fallback={modelKey ? undefined : 'box'}
-        tint={baseColor}
-        position={[0, 0, 0]}
-        isActive={targeted}
-        isBreached={compromised}
-        isProtected={defended}
-        debug={debug}
-      />
-
-      {/* Status ring on the ground — small footprint, always visible */}
-      {showStatusIcons && (
-        <mesh ref={ringRef} position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.42, 0.025, 8, 24]} />
-          <meshBasicMaterial color={baseColor} transparent opacity={0.6} />
-        </mesh>
-      )}
-
-      {/* Selection halo */}
-      {halo && (
-        <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.55, 0.62, 32]} />
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.7} side={THREE.DoubleSide} />
-        </mesh>
-      )}
-
-      <pointLight color={baseColor} intensity={compromised ? 2.2 : defended ? 1.5 : targeted ? 1.4 : 0.9} distance={2.8} decay={2} />
-
-      {showLabel && (
-        <MiniLabel position={[0, (MODEL_REGISTRY[modelKey]?.desiredHeight ?? 0.5) + 0.25, 0]} color={labelColor}>
-          {meta?.label || deviceId}
-        </MiniLabel>
-      )}
-    </group>
-  );
-}
-
-// ── Defense shield dome ───────────────────────────────────────────────────────
-function ShieldDome({ active }) {
-  const outerRef = useRef();
-  const innerRef = useRef();
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    const targetOuter = active ? 0.18 + Math.sin(t * 2.5) * 0.06 : 0;
-    const targetInner = active ? 0.07 + Math.sin(t * 4) * 0.03 : 0;
-    if (outerRef.current) {
-      outerRef.current.material.opacity += (targetOuter - outerRef.current.material.opacity) * 0.1;
-      outerRef.current.rotation.y = t * 0.1;
-    }
-    if (innerRef.current) {
-      innerRef.current.material.opacity += (targetInner - innerRef.current.material.opacity) * 0.1;
-    }
-  });
-  return (
-    <group position={[0, 0, 0]}>
-      <mesh ref={outerRef}>
-        <sphereGeometry args={[6, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshBasicMaterial color="#10ffac" transparent opacity={0} side={THREE.BackSide} depthWrite={false} wireframe />
-      </mesh>
-      <mesh ref={innerRef}>
-        <sphereGeometry args={[5.7, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshBasicMaterial color="#10ffac" transparent opacity={0} side={THREE.FrontSide} depthWrite={false} />
-      </mesh>
-      {active && <pointLight color="#10ffac" intensity={1.5} distance={14} position={[0, 4, 0]} />}
-    </group>
-  );
-}
-
-// ── Breach explosion ─────────────────────────────────────────────────────────
-function BreachExplosion({ position, active }) {
-  const groupRef = useRef();
-  const progressRef = useRef(0);
-  const PARTICLE_COUNT = 14;
-  const particles = useMemo(() => Array.from({ length: PARTICLE_COUNT }, () => {
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(2 * Math.random() - 1);
-    return {
-      dir: new THREE.Vector3(
-        Math.sin(phi) * Math.cos(theta),
-        Math.abs(Math.sin(phi) * Math.sin(theta)) + 0.3,
-        Math.sin(phi) * Math.cos(theta + 1),
-      ).normalize(),
-      speed: 0.8 + Math.random() * 1.6,
-      size: 0.05 + Math.random() * 0.07,
-    };
-  }), []);
-
-  useEffect(() => { if (!active) progressRef.current = 0; }, [active]);
-  useFrame((_, delta) => {
-    if (!active || !groupRef.current) return;
-    progressRef.current = Math.min(progressRef.current + delta * 1.6, 1);
-    groupRef.current.children.forEach((child, i) => {
-      if (i < PARTICLE_COUNT && particles[i]) {
-        const p = particles[i];
-        const dist = progressRef.current * p.speed;
-        child.position.set(p.dir.x * dist, p.dir.y * dist, p.dir.z * dist);
-        if (child.material) child.material.opacity = Math.max(0, 1 - progressRef.current * 1.4);
-      }
-    });
-  });
-
-  if (!active || !position) return null;
-  return (
-    <group ref={groupRef} position={position}>
-      {particles.map((p, i) => (
-        <mesh key={i}>
-          <sphereGeometry args={[p.size, 6, 6]} />
-          <meshBasicMaterial color="#ff3b6b" transparent opacity={1} depthWrite={false} />
-        </mesh>
-      ))}
-      <pointLight color="#ff3b6b" intensity={5} distance={4} decay={2} />
-    </group>
-  );
-}
-
-// ── Ambient atmospheric particles ─────────────────────────────────────────────
-const AMBIENT_PARTICLE_COUNT = 28;
-const AmbientParticles = memo(function AmbientParticles() {
+// ── Stars ───────────────────────────────────────────────────────────────────
+const STAR_COUNT = 120;
+const Stars = memo(function Stars() {
   const ref = useRef();
   const positions = useMemo(() => {
-    const arr = new Float32Array(AMBIENT_PARTICLE_COUNT * 3);
-    for (let i = 0; i < AMBIENT_PARTICLE_COUNT; i++) {
-      arr[i * 3]     = (Math.random() - 0.5) * 22;
-      arr[i * 3 + 1] = Math.random() * 6;
-      arr[i * 3 + 2] = (Math.random() - 0.5) * 22;
+    const arr = new Float32Array(STAR_COUNT * 3);
+    for (let i = 0; i < STAR_COUNT; i++) {
+      const r = 10 + Math.random() * 8;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      arr[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+      arr[i * 3 + 1] = r * Math.cos(phi) * 0.5;
+      arr[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
     }
     return arr;
   }, []);
-  useFrame(({ clock }) => { if (ref.current) ref.current.rotation.y = clock.getElapsedTime() * 0.025; });
+  useFrame(({ clock }) => {
+    if (ref.current) ref.current.rotation.y = clock.getElapsedTime() * 0.015;
+  });
   return (
     <points ref={ref}>
       <bufferGeometry>
-        <bufferAttribute attach="attributes-position" array={positions} count={AMBIENT_PARTICLE_COUNT} itemSize={3} />
+        <bufferAttribute attach="attributes-position" array={positions} count={STAR_COUNT} itemSize={3} />
       </bufferGeometry>
-      <pointsMaterial color="#00d4ff" size={0.04} transparent opacity={0.4} sizeAttenuation />
+      <pointsMaterial color="#9bc8ff" size={0.04} transparent opacity={0.45} sizeAttenuation />
     </points>
   );
 });
 
-// ── Environment background (heavy, optional, pick one at most) ──────────────
-function EnvironmentBackground({ environment }) {
-  if (!environment || environment === 'none') return null;
-  const modelKey = ENVIRONMENT_KEYS[environment];
-  if (!modelKey) return null;
-  const entry = getModelEntry(modelKey);
-  if (!entry) return null;
-  // Parked far from origin and lifted slightly so it acts as a skybox-style
-  // backdrop rather than blocking the battle scene.
+// ── Device node ─────────────────────────────────────────────────────────────
+function DeviceNode({
+  device, status, attacking, defended, hovered, selected,
+  showLabel, onHover, onSelect,
+}) {
+  const ref = useRef();
+  const ringRef = useRef();
+  const tone = statusTone(status);
+  const statusColor = STATUS_COLORS[tone];
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (ref.current) {
+      ref.current.rotation.y = t * 0.6;
+      // breathing scale for attacked / hovered / defended
+      const k =
+        attacking ? 1.0 + Math.sin(t * 8) * 0.18 :
+        defended  ? 1.0 + Math.sin(t * 5) * 0.10 :
+        hovered   ? 1.10 :
+        selected  ? 1.08 :
+        1.0;
+      ref.current.scale.setScalar(k);
+    }
+    if (ringRef.current) {
+      ringRef.current.rotation.z = t * 1.2;
+      ringRef.current.material.opacity = 0.45 + Math.sin(t * 3) * 0.15;
+    }
+  });
+
+  const pos = device.position3D;
+
   return (
-    <ModelAsset
-      key={environment}
-      modelKey={modelKey}
-      fallback={entry.fallback}
-      tint="#2a3754"
-      position={[0, -1, -18]}
-      scale={entry.scale ?? 0.3}
-    />
+    <group position={pos}>
+      {/* core */}
+      <mesh
+        ref={ref}
+        onPointerOver={(e) => { e.stopPropagation(); onHover?.({ id: device.id, kind: 'device', x: e.clientX, y: e.clientY }); }}
+        onPointerOut={(e)  => { e.stopPropagation(); onHover?.(null); }}
+        onPointerMove={(e) => { e.stopPropagation(); onHover?.({ id: device.id, kind: 'device', x: e.clientX, y: e.clientY }); }}
+        onClick={(e) => { e.stopPropagation(); onSelect?.({ id: device.id, kind: 'device' }); }}
+      >
+        <octahedronGeometry args={[0.22, 0]} />
+        <meshStandardMaterial
+          color={device.color}
+          emissive={tone === 'breach' ? statusColor : device.color}
+          emissiveIntensity={tone === 'breach' ? 1.4 : 0.75}
+          metalness={0.85}
+          roughness={0.15}
+        />
+      </mesh>
+
+      {/* outer ring */}
+      <mesh ref={ringRef}>
+        <torusGeometry args={[0.42, 0.018, 8, 32]} />
+        <meshBasicMaterial color={statusColor} transparent opacity={0.55} />
+      </mesh>
+
+      {/* attack pulse */}
+      {attacking && (
+        <mesh>
+          <sphereGeometry args={[0.55, 16, 16]} />
+          <meshBasicMaterial color="#ff3b6b" transparent opacity={0.18} />
+        </mesh>
+      )}
+
+      {/* defended flash */}
+      {defended && (
+        <mesh>
+          <sphereGeometry args={[0.55, 16, 16]} />
+          <meshBasicMaterial color="#10ffac" transparent opacity={0.18} />
+        </mesh>
+      )}
+
+      {(showLabel || hovered || selected || attacking) && (
+        <Html distanceFactor={9} position={[0, 0.55, 0]} center>
+          <div style={{
+            pointerEvents: 'none',
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 10, fontWeight: 700,
+            color: statusColor,
+            background: 'rgba(0,0,0,0.65)',
+            padding: '2px 6px',
+            borderRadius: 4,
+            border: `1px solid ${statusColor}55`,
+            whiteSpace: 'nowrap',
+          }}>
+            {device.icon} {device.label}
+          </div>
+        </Html>
+      )}
+    </group>
   );
 }
 
-// ── Main inner scene ─────────────────────────────────────────────────────────
-function SmartHome3DInner({
-  deviceStates,
-  activeAttack,
-  defendedTargets,
-  activeAgent,
-  shieldActive,
-  riskScore,
-  performanceMode,
-  enablePostprocessing,
-  agentStatuses,
-
-  // Scene visibility toggles (all optional)
-  showLabels,         // false by default; true = "debug labels" mode
-  showAttackBeams,    // true by default
-  showStatusIcons,    // true by default
-  showDebugGrid,      // false by default
-
-  // Environment: 'none' | 'cyber_city' | 'dystopian_city'
-  environment = 'none',
-
-  // Layout: 'exploded' (default, all GLBs visible) | 'house-mounted' (legacy compact layout)
-  layout = 'exploded',
-
-  // House: procedural holographic (default) or external house.glb model
-  useExternalHouse = false,
-
-  // Asset Debug: render bounding boxes around every loaded model
-  assetDebug = false,
-
-  // Interactivity
-  hoveredObjectId,
-  selectedObjectId,
-  onHover,
-  onSelect,
+// ── Crystal agent (orbit) ───────────────────────────────────────────────────
+function CrystalAgent({
+  agent, angle, status, breathOffset, hovered, selected, attacking,
+  onHover, onSelect, setAgentWorldPos,
 }) {
-  const agentNames = Object.keys(AGENT_HOME_POSITIONS);
-  const [glitchTrigger, setGlitchTrigger] = useState(0);
-  useEffect(() => {
-    if (activeAttack?.success === true) setGlitchTrigger((g) => g + 1);
-  }, [activeAttack?.success]);
+  const ref = useRef();
+  const ringRef = useRef();
+  const isAttacking = attacking || status === 'CHARGING' || status === 'ATTACKING';
 
-  const beamFrom = useMemo(() => {
-    if (!activeAgent) return null;
-    // Ideally we would read the live agent position, but using the "home"
-    // slot + crown height (~2.0) is close enough for the visual beam.
-    const home = AGENT_HOME_POSITIONS[activeAgent];
-    if (!home) return null;
-    return new THREE.Vector3(home[0], 2.0, home[2]);
-  }, [activeAgent]);
-  const beamTo = useMemo(() => {
-    if (!activeAttack?.target) return null;
-    const dp = getDevicePosition(activeAttack.target, layout);
-    if (!dp) return null;
-    return new THREE.Vector3(dp[0], (dp[1] || 0) + 0.4, dp[2]);
-  }, [activeAttack?.target, layout]);
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (!ref.current) return;
+    const x = Math.cos(angle + t * 0.06) * RADIUS;
+    const z = Math.sin(angle + t * 0.06) * RADIUS;
+    const y = 1.9 + Math.sin(t * 1.4 + breathOffset) * 0.22;
+    ref.current.position.set(x, y, z);
+    ref.current.rotation.y = t * 0.5;
+    if (ringRef.current) ringRef.current.rotation.z = t * 1.0;
+    // expose world position to parent so beams can use it
+    setAgentWorldPos?.(agent.name, new THREE.Vector3(x, y, z));
+  });
 
-  const riskMood = riskScore >= 80 ? 'chaos'
-                : riskScore >= 60 ? 'danger'
-                : riskScore >= 30 ? 'warning'
-                : 'calm';
-  const rimRed  = riskMood === 'chaos' ? 2.0 : riskMood === 'danger' ? 1.5 : 1.0;
-  const rimCyan = riskMood === 'calm' ? 1.3 : 0.9;
-
-  const wantsPostFX = enablePostprocessing && !performanceMode &&
-    (activeAttack !== null || riskScore >= 30 || shieldActive);
-
-  // Helper — should we label this object right now?
-  const shouldShowLabel = useCallback((id) => {
-    if (showLabels) return true;
-    if (hoveredObjectId === id) return true;
-    if (selectedObjectId === id) return true;
-    if (activeAttack?.agent === id) return true;
-    if (activeAttack?.target === id) return true;
-    return false;
-  }, [showLabels, hoveredObjectId, selectedObjectId, activeAttack]);
+  const auraOpacity = isAttacking ? 0.22 : hovered || selected ? 0.18 : 0.10;
 
   return (
-    <Canvas
-      camera={{ position: [11, 7, 12], fov: 45 }}
-      shadows={performanceMode ? false : 'basic'}
-      dpr={performanceMode ? [1, 1] : [1, 1.6]}
-      gl={{
-        antialias: !performanceMode,
-        alpha: true,
-        powerPreference: 'high-performance',
-        stencil: false,
-      }}
-      style={{ background: 'transparent', width: '100%', height: '100%' }}
-      performance={{ min: 0.4 }}
-      frameloop="always"
+    <group
+      ref={ref}
+      onPointerOver={(e) => { e.stopPropagation(); onHover?.({ id: agent.name, kind: 'agent', x: e.clientX, y: e.clientY }); }}
+      onPointerOut={(e)  => { e.stopPropagation(); onHover?.(null); }}
+      onPointerMove={(e) => { e.stopPropagation(); onHover?.({ id: agent.name, kind: 'agent', x: e.clientX, y: e.clientY }); }}
+      onClick={(e) => { e.stopPropagation(); onSelect?.({ id: agent.name, kind: 'agent' }); }}
     >
-      <color attach="background" args={['#03060c']} />
-      <fog attach="fog" args={['#03060c', 20, 36]} />
-      <ambientLight intensity={0.18} color="#5570aa" />
-      {!performanceMode && (
-        <directionalLight
-          position={[8, 14, 6]} intensity={0.6} color="#a8b8ff"
-          castShadow shadow-mapSize={[512, 512]}
-          shadow-camera-near={0.1} shadow-camera-far={30}
-          shadow-camera-left={-10} shadow-camera-right={10}
-          shadow-camera-top={10} shadow-camera-bottom={-10}
+      <mesh>
+        <sphereGeometry args={[0.62, 16, 16]} />
+        <meshBasicMaterial color={agent.color} transparent opacity={auraOpacity} />
+      </mesh>
+
+      <mesh castShadow>
+        <icosahedronGeometry args={[0.32, 0]} />
+        <meshStandardMaterial
+          color={agent.color}
+          emissive={agent.color}
+          emissiveIntensity={isAttacking ? 2.0 : 1.3}
+          roughness={0.15}
+          metalness={0.9}
         />
+      </mesh>
+
+      <mesh>
+        <sphereGeometry args={[0.15, 12, 12]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.85} />
+      </mesh>
+
+      <mesh ref={ringRef}>
+        <torusGeometry args={[0.58, 0.022, 8, 32]} />
+        <meshBasicMaterial color={agent.color} transparent opacity={0.6} />
+      </mesh>
+
+      <pointLight color={agent.color} intensity={isAttacking ? 2.2 : 1.4} distance={4} decay={2} />
+
+      {(hovered || selected || isAttacking) && (
+        <Html distanceFactor={9} position={[0, 0.85, 0]} center>
+          <div style={{
+            pointerEvents: 'none',
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 10, fontWeight: 700,
+            color: agent.color,
+            background: 'rgba(0,0,0,0.7)',
+            padding: '3px 7px',
+            borderRadius: 5,
+            border: `1px solid ${agent.color}aa`,
+            whiteSpace: 'nowrap',
+          }}>
+            {agent.icon} {agent.name} · {status || 'IDLE'}
+          </div>
+        </Html>
       )}
-      <pointLight position={[-8, 5, 4]} intensity={rimRed}  color="#ff3b6b" distance={20} />
-      <pointLight position={[8, 5, -4]} intensity={rimCyan} color="#00d4ff" distance={20} />
-      {!performanceMode && (
-        <pointLight position={[0, 8, -8]} intensity={0.8} color="#a855f7" distance={20} />
-      )}
+    </group>
+  );
+}
 
-      {/* Optional heavy environment background (only one can be active) */}
-      <EnvironmentBackground environment={environment} />
+// ── Attack beam (real-time, animated) ───────────────────────────────────────
+function AttackBeam({ from, to, color, blocked }) {
+  const lineRef = useRef();
+  const haloRef = useRef();
+  const geo = useMemo(() => new THREE.BufferGeometry().setFromPoints([from, to]), [from, to]);
+  useFrame(({ clock }) => {
+    if (lineRef.current) {
+      const k = (Math.sin(clock.getElapsedTime() * 7) + 1) * 0.5;
+      lineRef.current.material.opacity = 0.5 + k * 0.45;
+    }
+    if (haloRef.current) {
+      const k = (Math.sin(clock.getElapsedTime() * 4) + 1) * 0.5;
+      haloRef.current.scale.setScalar(1 + k * 0.4);
+    }
+  });
+  const beamColor = blocked ? '#10ffac' : color;
+  return (
+    <group>
+      <line ref={lineRef} geometry={geo}>
+        <lineBasicMaterial color={beamColor} transparent opacity={0.85} />
+      </line>
+      <mesh position={to}>
+        <sphereGeometry args={[0.16, 12, 12]} />
+        <meshBasicMaterial color={beamColor} transparent opacity={0.45} />
+      </mesh>
+      <mesh ref={haloRef} position={to}>
+        <sphereGeometry args={[0.32, 16, 16]} />
+        <meshBasicMaterial color={beamColor} transparent opacity={0.18} />
+      </mesh>
+    </group>
+  );
+}
 
-      <Floor showDebugGrid={showDebugGrid} />
-      {!performanceMode && <AmbientParticles />}
+// ── Shield dome ─────────────────────────────────────────────────────────────
+function ShieldDome({ visible }) {
+  const ref = useRef();
+  useFrame(({ clock }) => {
+    if (ref.current) {
+      const t = clock.getElapsedTime();
+      ref.current.rotation.y = t * 0.15;
+      ref.current.material.opacity = 0.18 + Math.sin(t * 2) * 0.06;
+    }
+  });
+  if (!visible) return null;
+  return (
+    <mesh ref={ref} position={[0, 1.2, 0]}>
+      <sphereGeometry args={[5.2, 32, 32]} />
+      <meshBasicMaterial color="#00d4ff" transparent opacity={0.22} wireframe />
+    </mesh>
+  );
+}
 
-      {useExternalHouse ? (
-        // External GLB house — auto-normalised to desiredHeight from registry
-        <ModelAsset modelKey="house" tint="#5cc8ff" position={[0, 0, 0]} debug={assetDebug} />
-      ) : (
-        <Float speed={1.2} rotationIntensity={0.04} floatIntensity={0.08}>
-          <HolographicHouse />
-        </Float>
-      )}
+// ── Camera rig ──────────────────────────────────────────────────────────────
+function CinematicCamera({ enabled }) {
+  useFrame(({ camera, clock }) => {
+    if (!enabled) return;
+    const t = clock.getElapsedTime();
+    const radius = 13;
+    camera.position.x = Math.cos(t * 0.06) * radius;
+    camera.position.z = Math.sin(t * 0.06) * radius;
+    camera.position.y = 6 + Math.sin(t * 0.13) * 0.5;
+    camera.lookAt(0, 1.5, 0);
+  });
+  return null;
+}
 
-      {agentNames.map((name) => (
-        <AgentFigure
-          key={name}
-          name={name}
-          isActive={activeAgent === name}
-          activeAttack={activeAgent === name ? activeAttack : null}
-          status={agentStatuses?.[name]}
-          showLabel={shouldShowLabel(name)}
-          isHovered={hoveredObjectId === name}
-          isSelected={selectedObjectId === name}
-          debug={assetDebug}
-          onPointerOver={(e) => onHover?.({ id: name, kind: 'agent', x: e?.clientX, y: e?.clientY })}
-          onPointerOut={() => onHover?.(null)}
-          onClick={() => onSelect?.({ id: name, kind: 'agent' })}
+// ── Scene contents (must live inside Canvas) ────────────────────────────────
+function Scene({
+  deviceStates, activeAttack, defendedTargets, agentStatuses, shieldActive,
+  performanceMode, showLabels,
+  hoveredObjectId, selectedObjectId,
+  onHover, onSelect,
+  autoOrbit,
+}) {
+  // Track each agent's current world position so we can draw beams to devices.
+  const agentPositions = useRef({});
+  const setAgentWorldPos = (name, v) => { agentPositions.current[name] = v; };
+
+  // Compute beam endpoints for the currently-active attack.
+  const beam = useMemo(() => {
+    if (!activeAttack?.agent || !activeAttack?.target) return null;
+    const targetDev = getDevice(activeAttack.target);
+    if (!targetDev) return null;
+    const to = new THREE.Vector3(...targetDev.position3D);
+    const agentPos = agentPositions.current[activeAttack.agent];
+    if (!agentPos) {
+      // fall back to static angle
+      const a = AGENT_ANGLES[activeAttack.agent] ?? 0;
+      const from = new THREE.Vector3(Math.cos(a) * RADIUS, 1.9, Math.sin(a) * RADIUS);
+      const agentMeta = AGENT_META.find((m) => m.name === activeAttack.agent);
+      return { from, to, color: agentMeta?.color || '#ff3b6b' };
+    }
+    const agentMeta = AGENT_META.find((m) => m.name === activeAttack.agent);
+    return { from: agentPos.clone(), to, color: agentMeta?.color || '#ff3b6b' };
+  }, [activeAttack]);
+
+  const blocked = activeAttack?.success === false;
+
+  return (
+    <>
+      <color attach="background" args={['#03060c']} />
+      <fog attach="fog" args={['#03060c', 16, 36]} />
+
+      <ambientLight intensity={0.2} color="#5570aa" />
+      <pointLight position={[-7, 6, 4]} intensity={1.0} color="#ff3b6b" distance={22} />
+      <pointLight position={[7, 6, -4]}  intensity={1.0} color="#00d4ff" distance={22} />
+      <pointLight position={[0, 9, -6]}  intensity={0.7} color="#a855f7" distance={22} />
+
+      {!performanceMode && <ReflectiveGround />}
+      {!performanceMode && <Stars />}
+
+      <Float speed={1.0} rotationIntensity={0.03} floatIntensity={0.06}>
+        <HolographicHouse />
+      </Float>
+
+      {/* Devices */}
+      {DEVICES.map((d) => (
+        <DeviceNode
+          key={d.id}
+          device={d}
+          status={deviceStates?.[d.id]?.status}
+          attacking={activeAttack?.target === d.id}
+          defended={defendedTargets.includes(d.id)}
+          hovered={hoveredObjectId === d.id}
+          selected={selectedObjectId === d.id}
+          showLabel={!!showLabels}
+          onHover={onHover}
+          onSelect={onSelect}
         />
       ))}
 
-      {DEVICES.map((d) => {
-        const isTargeted = activeAttack?.target === d.id;
-        const compromised = isTargeted && activeAttack?.success === true;
-        const defended = defendedTargets?.includes(d.id) || (isTargeted && activeAttack?.success === false);
-        return (
-          <DeviceNode
-            key={d.id}
-            deviceId={d.id}
-            compromised={compromised}
-            defended={defended}
-            targeted={isTargeted}
-            showLabel={shouldShowLabel(d.id)}
-            isHovered={hoveredObjectId === d.id}
-            isSelected={selectedObjectId === d.id}
-            showStatusIcons={showStatusIcons !== false}
-            layout={layout}
-            debug={assetDebug}
-            onPointerOver={(e) => onHover?.({ id: d.id, kind: 'device', x: e?.clientX, y: e?.clientY })}
-            onPointerOut={() => onHover?.(null)}
-            onClick={() => onSelect?.({ id: d.id, kind: 'device' })}
-          />
-        );
-      })}
+      {/* Agents */}
+      {AGENT_META.map((a, i) => (
+        <CrystalAgent
+          key={a.name}
+          agent={a}
+          angle={AGENT_ANGLES[a.name] ?? (i * Math.PI * 2) / AGENT_META.length}
+          status={agentStatuses?.[a.name] || 'IDLE'}
+          breathOffset={i * 0.7}
+          hovered={hoveredObjectId === a.name}
+          selected={selectedObjectId === a.name}
+          attacking={activeAttack?.agent === a.name}
+          onHover={onHover}
+          onSelect={onSelect}
+          setAgentWorldPos={setAgentWorldPos}
+        />
+      ))}
 
-      {showAttackBeams !== false && beamFrom && beamTo && activeAttack && (
-        <AttackEffectRouter
-          from={beamFrom}
-          to={beamTo}
-          tactic={activeAttack.tactic}
-          agent={activeAgent}
+      {beam && <AttackBeam from={beam.from} to={beam.to} color={beam.color} blocked={blocked} />}
+
+      <ShieldDome visible={!!shieldActive} />
+
+      <CinematicCamera enabled={autoOrbit} />
+      {!autoOrbit && (
+        <OrbitControls
+          enablePan
+          enableZoom
+          minDistance={6}
+          maxDistance={24}
+          maxPolarAngle={Math.PI / 2.05}
+          minPolarAngle={Math.PI / 6}
         />
       )}
+    </>
+  );
+}
 
-      <ShieldDome active={shieldActive} />
-
-      <BreachExplosion
-        position={activeAttack?.target ? getDevicePosition(activeAttack.target, layout) : null}
-        active={activeAttack?.success === true}
+// ── Public component ────────────────────────────────────────────────────────
+export default function SmartHome3D({
+  deviceStates = {},
+  activeAttack = null,
+  defendedTargets = [],
+  agentStatuses = {},
+  shieldActive = false,
+  performanceMode = false,
+  showLabels = false,
+  hoveredObjectId = null,
+  selectedObjectId = null,
+  onHover,
+  onSelect,
+  autoOrbit = false,
+}) {
+  return (
+    <Canvas
+      camera={{ position: [11, 6.5, 11], fov: 50 }}
+      shadows={false}
+      dpr={performanceMode ? [0.8, 1] : [1, 1.5]}
+      gl={{
+        antialias: !performanceMode,
+        alpha: false,
+        powerPreference: 'high-performance',
+        stencil: false,
+      }}
+      performance={{ min: 0.4 }}
+      style={{ background: 'transparent', height: '100%', width: '100%' }}
+    >
+      <Scene
+        deviceStates={deviceStates}
+        activeAttack={activeAttack}
+        defendedTargets={defendedTargets}
+        agentStatuses={agentStatuses}
+        shieldActive={shieldActive}
+        performanceMode={performanceMode}
+        showLabels={showLabels}
+        hoveredObjectId={hoveredObjectId}
+        selectedObjectId={selectedObjectId}
+        onHover={onHover}
+        onSelect={onSelect}
+        autoOrbit={autoOrbit}
       />
 
-      <OrbitControls
-        enablePan enableZoom
-        maxPolarAngle={Math.PI / 2.05}
-        minPolarAngle={Math.PI / 10}
-        maxDistance={22} minDistance={5}
-        enableDamping dampingFactor={0.08}
-      />
-
-      {wantsPostFX && (
+      {!performanceMode && (
         <EffectComposer multisampling={0} disableNormalPass>
-          <Bloom intensity={1.05} luminanceThreshold={0.25} luminanceSmoothing={0.5} mipmapBlur radius={0.75} />
-          <Glitch
-            key={glitchTrigger}
-            delay={[0.3, 0.6]}
-            duration={[0.18, 0.42]}
-            strength={[0.2, 0.6]}
-            mode={activeAttack?.success === true ? GlitchMode.SPORADIC : GlitchMode.DISABLED}
-            active={activeAttack?.success === true}
-            ratio={0.85}
-          />
-          <Vignette eskil={false} offset={0.22} darkness={0.88} />
+          <Bloom intensity={0.9} luminanceThreshold={0.25} luminanceSmoothing={0.5} mipmapBlur radius={0.7} />
+          <Vignette eskil={false} offset={0.2} darkness={0.85} />
         </EffectComposer>
       )}
     </Canvas>
   );
 }
-
-// Outer wrapper – memoised so the Canvas does not rebuild on every WS event.
-const SmartHome3D = memo(function SmartHome3D(props) {
-  return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <SmartHome3DInner {...props} />
-    </div>
-  );
-});
-
-export default SmartHome3D;

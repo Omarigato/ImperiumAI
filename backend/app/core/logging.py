@@ -9,6 +9,13 @@ def setup_logging(debug: bool = False) -> None:
     fmt = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
     datefmt = "%H:%M:%S"
 
+    # Force UTF-8 on stdout so emoji-laden log lines don't crash on
+    # Windows consoles (cp1252).
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(logging.Formatter(fmt=fmt, datefmt=datefmt))
 

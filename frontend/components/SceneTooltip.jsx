@@ -1,146 +1,131 @@
 /**
- * SceneTooltip.jsx
+ * SceneTooltip — DOM-level overlay that shows context for the object
+ * the user is hovering over inside the 3D scene.
  *
- * A compact floating tooltip rendered as a normal DOM overlay on top of the
- * 3D Canvas (NOT inside it). Keeping it out of the Canvas means:
- *   - text stays crisp at any zoom level;
- *   - no per-object Html re-render storm when the scene updates;
- *   - tooltip is automatically clipped by the canvas wrapper.
- *
- * Two presentation modes:
- *   - kind="device" → IoT device card (status, last action, risk).
- *   - kind="agent"  → red-team agent card (tactic, role).
- *
- * The parent passes screen coordinates {x, y} so we can position the card
- * near the hovered element without doing 3D projection ourselves.
+ * `position`  — { x, y } in pixels relative to the scene wrapper, or null.
+ * `kind`      — 'device' | 'agent'
+ * `objectId`  — device id (e.g. 'front_door') or agent name (e.g. 'ShadowInjector')
+ * `deviceState` — current backend state of the hovered device (when kind==='device')
+ * `agentStatus` — IDLE / CHARGING / ATTACKING / BREACH / BLOCKED
+ * `activeAttack` — currently-running attack (used to highlight if relevant)
  */
-import { getDevice, getDeviceIcon } from './meta/devices';
-import { getAgent } from './meta/agents';
+import { useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const STATUS_TONE = {
-  protected: '#10ffac',
-  safe: '#10ffac',
-  locked: '#10ffac',
-  closed: '#10ffac',
-  active: '#10ffac',
-  armed: '#10ffac',
-  normal: '#10ffac',
-  listening: '#10ffac',
-  inactive: '#10ffac',
-  off: '#888',
-  docked: '#888',
-  standby: '#888',
-  idle: '#888',
-  muted: '#ffd60a',
-  disabled: '#ffd60a',
-  disarmed: '#ff8a2a',
-  unlocked: '#ff3b6b',
-  open: '#ff8a2a',
-  on: '#ffd60a',
-  triggered: '#ff8a2a',
-  overridden: '#ff8a2a',
-  flooding: '#ff3b6b',
-  overloaded: '#ff3b6b',
-  critical: '#ff3b6b',
-  dns_poisoned: '#ff3b6b',
-  compromised: '#ff3b6b',
-  cleaning: '#ffd60a',
-  playing: '#ffd60a',
+import { getDevice } from './meta/devices';
+import { AGENTS as AGENT_META } from './meta/agents';
+
+const STATUS_COLORS = {
+  CHARGING:  '#00d4ff',
+  ATTACKING: '#ff9f0a',
+  BREACH:    '#ff3b6b',
+  BLOCKED:   '#10ffac',
+  IDLE:      '#9aa3b2',
 };
 
-function statusTone(status) {
-  return STATUS_TONE[status] || '#aab';
-}
-
 export default function SceneTooltip({
-  position,                 // {x, y} in viewport pixels, or null to hide
-  kind,                     // 'device' | 'agent'
-  objectId,                 // device id or agent name
-  deviceState,              // optional: live device state from backend
-  activeAttack,             // optional: current attack — to derive "under attack"
-  agentStatus,              // optional: agent status string (IDLE/CHARGING/…)
+  position, kind, objectId, deviceState, agentStatus, activeAttack,
 }) {
-  if (!position || !objectId || !kind) return null;
+  const content = useMemo(() => {
+    if (!position || !objectId) return null;
+    if (kind === 'device') {
+      const d = getDevice(objectId);
+      if (!d) return null;
+      return {
+        title: `${d.icon} ${d.label}`,
+        color: d.color,
+        rows: [
+          ['category',   d.category],
+          ['risk',       `${d.risk}/5`],
+          ['state',      deviceState?.status || 'unknown'],
+          ['safe',       (d.safe || []).join(', ')],
+          ['dangerous',  (d.dangerous || []).join(', ')],
+        ],
+        note: d.cyberWhy,
+        highlight: activeAttack?.target === objectId,
+      };
+    }
+    if (kind === 'agent') {
+      const a = AGENT_META.find((x) => x.name === objectId);
+      if (!a) return null;
+      return {
+        title: `${a.icon} ${a.name}`,
+        color: a.color,
+        rows: [
+          ['category',  a.category],
+          ['status',    agentStatus || 'IDLE'],
+          ['tactics',   (a.techniques || []).slice(0, 3).join(', ') + (a.techniques?.length > 3 ? '…' : '')],
+        ],
+        note: a.short,
+        highlight: activeAttack?.agent === objectId,
+      };
+    }
+    return null;
+  }, [position, kind, objectId, deviceState, agentStatus, activeAttack]);
 
-  // Position the tooltip with a small offset, keep it inside the wrapper.
-  const style = {
-    position: 'absolute',
-    left: Math.max(8, position.x + 14),
-    top:  Math.max(8, position.y + 14),
-    zIndex: 40,
-    pointerEvents: 'none',
-    maxWidth: 240,
-    padding: '8px 10px',
-    background: 'rgba(8, 12, 22, 0.92)',
-    backdropFilter: 'blur(6px)',
-    border: '1px solid rgba(0, 212, 255, 0.45)',
-    borderRadius: 8,
-    boxShadow: '0 6px 24px rgba(0, 0, 0, 0.55)',
-    fontFamily: 'JetBrains Mono, monospace',
-    color: '#e6edf3',
-    fontSize: 11,
-    lineHeight: 1.45,
-  };
-
-  if (kind === 'device') {
-    const meta = getDevice(objectId);
-    if (!meta) return null;
-    const status = deviceState?.status || 'unknown';
-    const tone = statusTone(status);
-    const underAttack = activeAttack?.target === objectId;
-    const lastAction = deviceState?.last_action || '—';
-    return (
-      <div style={style}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-          <span style={{ fontSize: 14 }}>{getDeviceIcon(objectId)}</span>
-          <span style={{ fontWeight: 700, color: meta.color }}>{meta.label}</span>
-          <span style={{
-            marginLeft: 'auto', padding: '1px 5px', borderRadius: 4,
-            fontSize: 9, color: '#aab', border: '1px solid #2b3140',
-          }}>R{meta.risk}</span>
-        </div>
-        <Row label="status" value={status} tone={tone} />
-        <Row label="under attack" value={underAttack ? 'yes' : 'no'} tone={underAttack ? '#ff8a2a' : '#888'} />
-        <Row label="last action" value={lastAction} tone="#aab" />
-        <Row label="dangerous" value={meta.dangerous.join(', ').slice(0, 60) || '—'} tone="#ff8a2a" />
-      </div>
-    );
-  }
-
-  if (kind === 'agent') {
-    const meta = getAgent(objectId);
-    if (!meta) return null;
-    const tone =
-      agentStatus === 'BREACH'    ? '#ff3b6b' :
-      agentStatus === 'BLOCKED'   ? '#10ffac' :
-      agentStatus === 'ATTACKING' ? '#ff8a2a' :
-      agentStatus === 'CHARGING'  ? '#00d4ff' :
-      '#aab';
-    const tactic = activeAttack?.agent === objectId ? activeAttack?.tactic : null;
-    return (
-      <div style={style}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-          <span style={{ fontSize: 14 }}>{meta.icon}</span>
-          <span style={{ fontWeight: 700, color: meta.color }}>{meta.name}</span>
-        </div>
-        <Row label="role"  value={meta.category} tone="#aab" />
-        <Row label="state" value={agentStatus || 'IDLE'} tone={tone} />
-        {tactic && <Row label="tactic" value={tactic} tone="#00d4ff" />}
-        <Row label="goal"  value={meta.short} tone="#aab" />
-      </div>
-    );
-  }
-
-  return null;
-}
-
-function Row({ label, value, tone }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-      <span style={{ color: '#7a8294', textTransform: 'uppercase', fontSize: 9, letterSpacing: '0.05em' }}>{label}</span>
-      <span style={{ color: tone, textAlign: 'right', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {value}
-      </span>
-    </div>
+    <AnimatePresence>
+      {content && position && (
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.12 }}
+          style={{
+            position: 'absolute',
+            left: Math.min(position.x + 12, 999999),
+            top:  Math.min(position.y + 12, 999999),
+            zIndex: 40,
+            pointerEvents: 'none',
+            maxWidth: 280,
+            padding: 10,
+            borderRadius: 8,
+            background: 'rgba(10, 14, 22, 0.92)',
+            backdropFilter: 'blur(8px)',
+            border: `1px solid ${content.color}55`,
+            boxShadow: content.highlight
+              ? `0 0 0 1px ${content.color}, 0 12px 30px rgba(0,0,0,0.4)`
+              : '0 12px 30px rgba(0,0,0,0.4)',
+            color: 'var(--wv-text, #e7e9ee)',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            fontSize: 12,
+          }}
+        >
+          <div style={{
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 12, fontWeight: 700,
+            color: content.color, marginBottom: 6,
+          }}>
+            {content.title}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {content.rows.filter(([, v]) => v).map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', gap: 8, fontSize: 11 }}>
+                <span style={{ color: 'var(--wv-text-3, #8a93a3)', minWidth: 70 }}>{k}</span>
+                <span style={{
+                  color: k === 'status' && STATUS_COLORS[String(v).toUpperCase()]
+                    ? STATUS_COLORS[String(v).toUpperCase()]
+                    : 'var(--wv-text, #e7e9ee)',
+                  fontFamily: 'JetBrains Mono, monospace',
+                  wordBreak: 'break-word',
+                }}>{v}</span>
+              </div>
+            ))}
+          </div>
+          {content.note && (
+            <div style={{
+              marginTop: 6,
+              paddingTop: 6,
+              borderTop: '1px solid rgba(255,255,255,0.07)',
+              fontSize: 11,
+              color: 'var(--wv-text-2, #aab)',
+              lineHeight: 1.4,
+            }}>
+              {content.note}
+            </div>
+          )}
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

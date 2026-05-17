@@ -1,29 +1,26 @@
 /**
- * Battle page — AegisAI diploma demo (v3 · clean scene).
+ * Battle page — AegisAI diploma demo (v5 · procedural 3D, no GLB).
  *
  * Layout
- *   ┌──────────────┬────────────────────────────────────┬─────────────────┐
- *   │  AGENTS list │ 3D scene (no permanent text)       │  Side-Tabs      │
- *   │  (left)      │ + small HUD overlays + tooltip     │  (7 tabs right) │
- *   └──────────────┴────────────────────────────────────┴─────────────────┘
+ *   ┌──────────────┬──────────────────────────────┬─────────────────┐
+ *   │  AGENTS list │ SmartHome3D (procedural)     │  Side-Tabs (7)  │
+ *   │  (left)      │ + Attack pipeline + Risk     │  (right)        │
+ *   └──────────────┴──────────────────────────────┴─────────────────┘
  *
- * Focus Mode (key: F  ·  Esc to exit) hides every panel so only the 3D
- * scene, the minimal HUD and a compact risk badge remain visible.
+ * The scene no longer loads any .glb assets — `SmartHome3D` is fully
+ * procedural (primitive Three.js geometries built in-canvas).
  *
- * 3D labels are NEVER permanent. They appear only when:
- *   - hover, or
- *   - selected (click), or
- *   - object is part of the currently active attack, or
- *   - the "Show labels" toggle is on (debug).
+ * Focus Mode (key: F · Esc to exit) hides every panel except the central
+ * scene and a compact HUD.
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play, RotateCcw, Shield, RefreshCcw, Skull, Activity, Zap, Cpu,
-  Maximize2, Minimize2, Tag, Eye, EyeOff, Crosshair, Grid3X3, X,
-  Home, Bug,
+  Maximize2, Minimize2, Tag, X, Orbit,
 } from 'lucide-react';
+
 import NavBar from '../components/NavBar';
 import RiskMeter from '../components/RiskMeter';
 import BattleResult from '../components/BattleResult';
@@ -34,7 +31,45 @@ import SceneTooltip from '../components/SceneTooltip';
 import { AGENTS as AGENT_META } from '../components/meta/agents';
 import wsService from '../services/websocket';
 
-const SmartHome3D = dynamic(() => import('../components/SmartHome3D'), { ssr: false });
+// 3D battle scene — heavy WebGL, client-only. Auto-recover from dev-only
+// stale-chunk errors after a hot rebuild.
+const SmartHome3D = dynamic(
+  () =>
+    import('../components/SmartHome3D').catch((err) => {
+      if (typeof window !== 'undefined' && /ChunkLoadError|Loading chunk/i.test(String(err))) {
+        if (!sessionStorage.getItem('aegis-battle-3d-reloaded')) {
+          sessionStorage.setItem('aegis-battle-3d-reloaded', '1');
+          window.location.reload();
+          return { default: () => null };
+        }
+      }
+      return {
+        default: () => (
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--wv-text-2)', fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 12, opacity: 0.85,
+          }}>
+            3D scene failed to load — check console
+          </div>
+        ),
+      };
+    }),
+  {
+    ssr: false,
+    loading: () => (
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'var(--wv-text-2)', fontFamily: 'JetBrains Mono, monospace',
+        fontSize: 12, opacity: 0.6,
+      }}>
+        Loading battle scene…
+      </div>
+    ),
+  },
+);
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const MAX_LOGS = 100;
@@ -71,25 +106,15 @@ export default function BattlePage() {
 
   const [stats, setStats] = useState({ red: 0, defense: 0, breaches: 0 });
 
-  // ── scene controls / focus mode ──────────────────────────────────────────
-  const [performanceMode, setPerformanceMode] = useState(false);
+  // ── Scene controls ──────────────────────────────────────────────────────
   const [focusMode, setFocusMode] = useState(false);
-  const [showLabels, setShowLabels] = useState(false);           // debug all-labels
-  const [showAttackBeams, setShowAttackBeams] = useState(true);
-  const [showStatusIcons, setShowStatusIcons] = useState(true);
-  const [showDebugGrid, setShowDebugGrid] = useState(false);
-  // environment: 'none' | 'cyber_city' | 'dystopian_city' — only ONE at a time
-  const [environment, setEnvironment] = useState('none');
-  // layout: 'exploded' (default — every GLB visible) | 'house-mounted' (compact)
-  const [layout, setLayout] = useState('exploded');
-  // External house.glb instead of the procedural holographic house
-  const [useExternalHouse, setUseExternalHouse] = useState(false);
-  // Asset Debug — bounding boxes + always-on labels for every model
-  const [assetDebug, setAssetDebug] = useState(false);
+  const [performanceMode, setPerformanceMode] = useState(false);
+  const [showLabels, setShowLabels] = useState(false);
+  const [autoOrbit, setAutoOrbit] = useState(true);
 
-  // ── hover / selection / tooltip ──────────────────────────────────────────
-  const [hovered, setHovered] = useState(null);                  // { id, kind, x, y }
-  const [selected, setSelected] = useState(null);                // { id, kind }
+  // ── Hover / selection / tooltip overlay ─────────────────────────────────
+  const [hovered, setHovered] = useState(null);     // { id, kind, x, y } (x,y wrapper-relative)
+  const [selected, setSelected] = useState(null);   // { id, kind }
   const sceneWrapRef = useRef(null);
 
   const logIdRef = useRef(0);
@@ -106,20 +131,18 @@ export default function BattlePage() {
 
   const battleStatus = battleResult ? 'ended' : running ? 'running' : 'idle';
 
-  // ── WebSocket wiring (omitted comments for brevity – same as before) ────
+  // ── WebSocket wiring ────────────────────────────────────────────────────
   useEffect(() => {
     wsService.connect();
 
     const unsubs = [
-      wsService.on('connected', () => { setConnected(true); addLog('System', 'Connected to AegisAI backend'); }),
+      wsService.on('connected',    () => { setConnected(true);  addLog('System', 'Connected to AegisAI backend'); }),
       wsService.on('disconnected', () => { setConnected(false); addLog('System', 'Reconnecting…'); }),
 
       wsService.on('attack_launched', (data) => {
         setActiveAgent(data.agent);
         setRound((r) => data.round || r);
-        setLlmResponse(null);
-        setPolicyResult(null);
-        setIotResult(null);
+        setLlmResponse(null); setPolicyResult(null); setIotResult(null);
         if (data.prompt) {
           setLastPrompt({ agent: data.agent, tactic: data.tactic, target: data.target, text: data.prompt });
         }
@@ -183,8 +206,8 @@ export default function BattlePage() {
         const status = data.attack_success ? 'BREACH' : 'BLOCKED';
         setAgentStatuses((prev) => ({ ...prev, [data.agent]: status }));
         setStats((prev) => ({
-          red: prev.red + (data.attack_success ? 1 : 0),
-          defense: prev.defense + (data.attack_success ? 0 : 1),
+          red:      prev.red      + (data.attack_success ? 1 : 0),
+          defense:  prev.defense  + (data.attack_success ? 0 : 1),
           breaches: prev.breaches + (data.attack_success ? 1 : 0),
         }));
         setTimeout(() => {
@@ -203,8 +226,7 @@ export default function BattlePage() {
 
       wsService.on('reset', (data) => {
         if (data.device_states) setDeviceStates(data.device_states);
-        setShieldActive(false);
-        setShieldRoundsLeft(0);
+        setShieldActive(false); setShieldRoundsLeft(0);
         addLog('System', 'Simulation reset');
       }),
 
@@ -215,8 +237,7 @@ export default function BattlePage() {
       }),
       wsService.on('shield_active', (data) => setShieldRoundsLeft(data.rounds_left || 0)),
       wsService.on('shield_expired', () => {
-        setShieldActive(false);
-        setShieldRoundsLeft(0);
+        setShieldActive(false); setShieldRoundsLeft(0);
         addLog('Defense', '🔓 Shield expired', 'warning');
       }),
     ];
@@ -224,23 +245,30 @@ export default function BattlePage() {
     return () => { unsubs.forEach((fn) => fn()); wsService.disconnect(); };
   }, [addLog]);
 
-  // ── Focus-mode hotkeys (F to toggle, Esc to exit) ───────────────────────
+  // ── Focus-mode hotkeys ──────────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e) => {
-      // Don't capture when user is typing in inputs
       const tag = (e.target?.tagName || '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || e.target?.isContentEditable) return;
-      if (e.key === 'Escape' && focusMode) {
-        setFocusMode(false);
-        e.preventDefault();
-      } else if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        setFocusMode((v) => !v);
-        e.preventDefault();
+      if (e.key === 'Escape' && focusMode) { setFocusMode(false); e.preventDefault(); }
+      else if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        setFocusMode((v) => !v); e.preventDefault();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [focusMode]);
+
+  // ── Initial fetch — seed device states even before WS connects ──────────
+  useEffect(() => {
+    fetch(`${API}/api/status`)
+      .then((r) => r.json())
+      .then((s) => {
+        if (s?.device_states) setDeviceStates(s.device_states);
+        if (s?.llm?.active) setActiveProvider(s.llm.active);
+      })
+      .catch(() => {});
+  }, []);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const startSimulation = useCallback(async () => {
@@ -303,10 +331,9 @@ export default function BattlePage() {
     } catch { addLog('System', 'Countermeasures failed', 'error'); }
   }, [running, riskResetting, addLog]);
 
-  // ── Scene interactivity callbacks ───────────────────────────────────────
+  // ── 3D scene interactivity ──────────────────────────────────────────────
   const handleHover = useCallback((info) => {
     if (!info) { setHovered(null); return; }
-    // Convert client coords to coords relative to the canvas wrapper
     if (sceneWrapRef.current && info.x != null && info.y != null) {
       const r = sceneWrapRef.current.getBoundingClientRect();
       setHovered({ id: info.id, kind: info.kind, x: info.x - r.left, y: info.y - r.top });
@@ -320,42 +347,32 @@ export default function BattlePage() {
     setSelected((prev) => (prev?.id === info.id ? null : { id: info.id, kind: info.kind }));
   }, []);
 
-  // ── memoised props for 3D scene ─────────────────────────────────────────
+  // ── Memoised scene props ────────────────────────────────────────────────
   const scene3DProps = useMemo(() => ({
     deviceStates,
     activeAttack,
     defendedTargets,
-    activeAgent,
     agentStatuses,
     shieldActive,
-    riskScore,
     performanceMode,
-    enablePostprocessing: true,
-    // Asset Debug also forces all labels on so you can identify each model.
-    showLabels: showLabels || assetDebug,
-    showAttackBeams,
-    showStatusIcons,
-    showDebugGrid,
-    environment,
-    layout,
-    useExternalHouse,
-    assetDebug,
+    showLabels,
+    autoOrbit,
     hoveredObjectId: hovered?.id || null,
     selectedObjectId: selected?.id || null,
     onHover: handleHover,
     onSelect: handleSelect,
   }), [
-    deviceStates, activeAttack, defendedTargets, activeAgent, agentStatuses,
-    shieldActive, riskScore, performanceMode, showLabels, showAttackBeams,
-    showStatusIcons, showDebugGrid, environment, layout, useExternalHouse,
-    assetDebug, hovered?.id, selected?.id, handleHover, handleSelect,
+    deviceStates, activeAttack, defendedTargets, agentStatuses,
+    shieldActive, performanceMode, showLabels, autoOrbit,
+    hovered?.id, selected?.id, handleHover, handleSelect,
   ]);
 
   const hoveredDeviceState = hovered?.kind === 'device' ? deviceStates[hovered.id] : null;
+  const hoveredAgentStatus = hovered?.kind === 'agent'  ? agentStatuses[hovered.id] : null;
 
+  // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div className="wv" style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* NavBar — always visible (z=50) */}
       <div style={{ flex: '0 0 auto' }}>
         <NavBar live={connected} currentRound={round} />
       </div>
@@ -364,11 +381,10 @@ export default function BattlePage() {
       {!focusMode && (
         <>
           <div style={{
-            flex: '0 0 auto',
-            padding: '10px 20px',
+            flex: '0 0 auto', padding: '10px 20px',
             borderBottom: '1px solid var(--wv-border)',
-            display: 'flex', gap: 10, alignItems: 'center',
-            background: 'var(--wv-bg)', flexWrap: 'wrap',
+            display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
+            background: 'var(--wv-bg)',
           }}>
             <button onClick={startSimulation} disabled={running}
               className={`wv-btn ${running ? 'wv-btn-ghost' : 'wv-btn-primary'} wv-btn-sm`}
@@ -389,62 +405,27 @@ export default function BattlePage() {
               <RefreshCcw size={13} /> {riskResetting ? 'Deploying…' : 'Counter'}
             </button>
 
-            <ToggleButton on={performanceMode} onClick={() => setPerformanceMode((v) => !v)}
-              icon={Cpu} title="Toggle low-performance render">
+            <SceneToggle on={performanceMode} onClick={() => setPerformanceMode((v) => !v)}
+              icon={Cpu} title="Toggle low-performance render (no post-FX, no reflections)">
               Perf: {performanceMode ? 'low' : 'high'}
-            </ToggleButton>
+            </SceneToggle>
 
-            <ToggleButton on={focusMode} onClick={() => setFocusMode((v) => !v)}
+            <SceneToggle on={autoOrbit} onClick={() => setAutoOrbit((v) => !v)}
+              icon={Orbit} title="Auto-orbit camera (off = orbit/zoom by mouse)">
+              {autoOrbit ? 'Auto-Orbit' : 'Manual'}
+            </SceneToggle>
+
+            <SceneToggle on={showLabels} onClick={() => setShowLabels((v) => !v)}
+              icon={Tag} title="Always show labels for every device">
+              Labels
+            </SceneToggle>
+
+            <SceneToggle on={focusMode} onClick={() => setFocusMode((v) => !v)}
               icon={Maximize2} title="Focus mode — hide all panels (F)">
               Focus
-            </ToggleButton>
+            </SceneToggle>
 
             <div style={{ flex: 1, minWidth: 8 }} />
-
-            {/* Scene visibility toggles */}
-            <SceneToggle on={showLabels}      onClick={() => setShowLabels((v) => !v)}      iconOn={Tag}        iconOff={Tag}        title="Show labels for every object (F default off)">Labels</SceneToggle>
-            <SceneToggle on={showAttackBeams} onClick={() => setShowAttackBeams((v) => !v)} iconOn={Crosshair}  iconOff={Crosshair}  title="Show 3D attack beams">Beams</SceneToggle>
-            <SceneToggle on={showStatusIcons} onClick={() => setShowStatusIcons((v) => !v)} iconOn={Eye}        iconOff={EyeOff}     title="Show status icons">Icons</SceneToggle>
-            <SceneToggle on={showDebugGrid}   onClick={() => setShowDebugGrid((v) => !v)}   iconOn={Grid3X3}    iconOff={Grid3X3}    title="Show debug grid">Grid</SceneToggle>
-
-            {/* Layout selector — exploded (default) | house-mounted */}
-            <SelectChip
-              label="LAYOUT"
-              value={layout}
-              onChange={setLayout}
-              options={[
-                ['exploded',      'exploded'],
-                ['house-mounted', 'house'],
-              ]}
-              title="exploded: every GLB visible · house-mounted: legacy compact layout"
-            />
-
-            {/* External house.glb (27 MB) vs procedural holographic house */}
-            <SceneToggle on={useExternalHouse} onClick={() => setUseExternalHouse((v) => !v)}
-              iconOn={Home} iconOff={Home}
-              title="Render house.glb (~27 MB) instead of the procedural holographic house">
-              House{useExternalHouse ? '·glb' : '·holo'}
-            </SceneToggle>
-
-            {/* Asset Debug — bounding boxes + labels for every model */}
-            <SceneToggle on={assetDebug} onClick={() => setAssetDebug((v) => !v)}
-              iconOn={Bug} iconOff={Bug}
-              title="Asset Debug: bounding boxes + permanent labels + loaded/fallback path">
-              Debug
-            </SceneToggle>
-
-            {/* Environment selector — only ONE heavy backdrop at a time */}
-            <SelectChip
-              label="ENV"
-              value={environment}
-              onChange={setEnvironment}
-              options={[
-                ['none',           'none'],
-                ['cyber_city',     'cyber_city'],
-                ['dystopian_city', 'dystopian_city'],
-              ]}
-              title="Heavy background. Only ONE can be active (22–30 MB each)."
-            />
 
             <span className="wv-badge" style={{ flex: '0 0 auto' }}>
               R <span className="wv-mono" style={{ color: 'var(--wv-cyan)', marginLeft: 4 }}>{round}</span>
@@ -459,8 +440,7 @@ export default function BattlePage() {
 
           {/* LLM strip */}
           <div style={{
-            flex: '0 0 auto',
-            padding: '8px 20px',
+            flex: '0 0 auto', padding: '8px 20px',
             borderBottom: '1px solid var(--wv-border)',
             background: 'var(--wv-surface)',
             overflowX: 'auto',
@@ -488,9 +468,8 @@ export default function BattlePage() {
           </div>
         )}
 
-        {/* CENTER — 3D + pipeline + risk */}
+        {/* CENTER — 3D scene + pipeline + risk */}
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
-          {/* 3D scene */}
           <div
             ref={sceneWrapRef}
             style={{ flex: '1 1 0', minHeight: 0, position: 'relative' }}
@@ -498,17 +477,16 @@ export default function BattlePage() {
           >
             <SmartHome3D {...scene3DProps} />
 
-            {/* Tooltip (DOM overlay, z=40) */}
             <SceneTooltip
               position={hovered ? { x: hovered.x, y: hovered.y } : null}
               kind={hovered?.kind}
               objectId={hovered?.id}
               deviceState={hoveredDeviceState}
+              agentStatus={hoveredAgentStatus}
               activeAttack={activeAttack}
-              agentStatus={hovered?.kind === 'agent' ? agentStatuses[hovered.id] : null}
             />
 
-            {/* Top-left HUD (round / agent — small, z=20) */}
+            {/* Top-left HUD */}
             <div style={{
               position: 'absolute', top: 12, left: 12, zIndex: 20,
               padding: '6px 10px', borderRadius: 8,
@@ -529,7 +507,7 @@ export default function BattlePage() {
               )}
             </div>
 
-            {/* Top-right compact risk badge */}
+            {/* Top-right risk badge */}
             <div style={{
               position: 'absolute', top: 12, right: 12, zIndex: 20,
               padding: '6px 10px', borderRadius: 8,
@@ -548,7 +526,7 @@ export default function BattlePage() {
               <span>{riskLevel}</span>
             </div>
 
-            {/* Focus mode exit + minimal controls */}
+            {/* Focus-mode mini controls */}
             {focusMode && (
               <div style={{
                 position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)',
@@ -570,7 +548,7 @@ export default function BattlePage() {
               </div>
             )}
 
-            {/* Active attack overlay (small card) — only when an attack is running */}
+            {/* Active attack overlay */}
             <AnimatePresence>
               {activeAttack && !focusMode && (
                 <motion.div
@@ -596,14 +574,14 @@ export default function BattlePage() {
               )}
             </AnimatePresence>
 
-            {/* Selected card (click to dismiss) */}
+            {/* Selected card */}
             {selected && !focusMode && (
               <div style={{
                 position: 'absolute', bottom: 12, right: 12, zIndex: 20,
                 padding: 10, borderRadius: 8,
                 background: 'rgba(20, 25, 40, 0.92)', backdropFilter: 'blur(8px)',
                 border: '1px solid var(--wv-cyan, #00d4ff)55',
-                maxWidth: 260,
+                maxWidth: 280,
                 display: 'flex', alignItems: 'center', gap: 8,
               }}>
                 <div className="wv-mono" style={{ fontSize: 11 }}>
@@ -660,7 +638,7 @@ export default function BattlePage() {
           )}
         </div>
 
-        {/* RIGHT — side tabs, hidden in focus mode */}
+        {/* RIGHT — side tabs */}
         {!focusMode && (
           <div style={{
             borderLeft: '1px solid var(--wv-border)',
@@ -686,7 +664,7 @@ export default function BattlePage() {
         )}
       </div>
 
-      {/* Battle result overlay (z=100) */}
+      {/* Battle result overlay */}
       <AnimatePresence>
         {battleResult && (
           <BattleResult result={battleResult} onPlayAgain={handlePlayAgain} onClose={() => setBattleResult(null)} />
@@ -696,8 +674,8 @@ export default function BattlePage() {
   );
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────
-function ToggleButton({ on, onClick, icon: Icon, title, children }) {
+// ── Reusable scene toggle ───────────────────────────────────────────────────
+function SceneToggle({ on, onClick, icon: Icon, title, children }) {
   return (
     <button onClick={onClick} className={`wv-btn ${on ? 'wv-btn-success' : 'wv-btn-ghost'} wv-btn-sm`}
       title={title} style={{ flex: '0 0 auto' }}>
@@ -706,61 +684,7 @@ function ToggleButton({ on, onClick, icon: Icon, title, children }) {
   );
 }
 
-function SelectChip({ label, value, onChange, options, title }) {
-  return (
-    <label
-      title={title}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 4,
-        padding: '3px 6px', fontSize: 10, fontWeight: 600,
-        color: 'var(--wv-text-2, #aab)',
-        border: '1px solid var(--wv-border, #2b3140)',
-        borderRadius: 6, flex: '0 0 auto',
-      }}
-    >
-      {label}
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="wv-mono"
-        style={{
-          background: 'transparent',
-          color: 'var(--wv-cyan, #00d4ff)',
-          border: 'none', outline: 'none',
-          fontSize: 10, fontWeight: 700, cursor: 'pointer',
-        }}
-      >
-        {options.map(([val, lbl]) => (
-          <option key={val} value={val}>{lbl}</option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function SceneToggle({ on, onClick, iconOn: IconOn, iconOff: IconOff, title, children }) {
-  const Icon = on ? IconOn : IconOff;
-  return (
-    <button onClick={onClick}
-      title={title}
-      aria-pressed={on}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 4,
-        padding: '4px 8px',
-        fontSize: 11, fontWeight: 600,
-        background: on ? 'rgba(0,212,255,0.10)' : 'transparent',
-        color: on ? 'var(--wv-cyan, #00d4ff)' : 'var(--wv-text-2, #aab)',
-        border: `1px solid ${on ? 'rgba(0,212,255,0.4)' : 'var(--wv-border, #2b3140)'}`,
-        borderRadius: 6,
-        cursor: 'pointer',
-        fontFamily: 'inherit',
-        flex: '0 0 auto',
-      }}>
-      <Icon size={11} /> {children}
-    </button>
-  );
-}
-
+// ── Left-side AgentsPanel ───────────────────────────────────────────────────
 function AgentsPanel({ agentStatuses, activeAgent }) {
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: 12 }}>
@@ -799,19 +723,12 @@ function AgentsPanel({ agentStatuses, activeAgent }) {
                 }}>{agent.icon}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="wv-h4" style={{ fontSize: 12, color: agent.color }}>{agent.name}</div>
-                  <div className="wv-body" style={{ fontSize: 10, marginTop: 1 }}>{agent.category}</div>
+                  <div className="wv-body" style={{
+                    fontSize: 10, marginTop: 1,
+                    color: statusColor, fontFamily: 'JetBrains Mono, monospace',
+                    fontWeight: 700, letterSpacing: '0.04em',
+                  }}>{status}</div>
                 </div>
-              </div>
-              <div className="wv-body" style={{ fontSize: 10, marginTop: 6, lineHeight: 1.4 }}>{agent.short}</div>
-              <div style={{
-                marginTop: 6, fontSize: 9,
-                fontFamily: 'JetBrains Mono, monospace',
-                fontWeight: 600, letterSpacing: '0.1em',
-                color: statusColor,
-                display: 'flex', alignItems: 'center', gap: 5,
-              }}>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: statusColor }} />
-                {status}
               </div>
             </div>
           );

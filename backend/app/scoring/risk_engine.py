@@ -11,11 +11,15 @@ _SEVERITY_DELTA = {"none": 0, "low": 3, "medium": 8, "high": 15, "critical": 25}
 _BLOCK_RECOVERY = {"none": 2, "low": 3, "medium": 5, "high": 8, "critical": 10}
 
 
-def _level(score: int) -> str:
+def level_for(score: int) -> str:
     for threshold, label in _LEVELS:
         if score <= threshold:
             return label
     return "breach"
+
+
+# Backwards-compatible alias used inside this module.
+_level = level_for
 
 
 class RiskEngine:
@@ -27,6 +31,13 @@ class RiskEngine:
 
     def reset(self) -> None:
         self._score = 0
+
+    def reduce_score(self, amount: int) -> int:
+        """Subtract `amount` from the current risk score (floored at 0).
+        Returns the actual delta (negative or zero)."""
+        old = self._score
+        self._score = max(0, self._score - max(0, int(amount)))
+        return self._score - old
 
     def update_score(
         self,
