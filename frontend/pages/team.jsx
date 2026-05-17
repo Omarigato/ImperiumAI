@@ -3,16 +3,17 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Send, MapPin, GraduationCap, User, Code, Play } from 'lucide-react';
 import NavBar from '../components/NavBar';
+import { useLang } from '../contexts/LanguageContext';
 
-const TEAM_MEMBERS = [
+// Non-translatable team metadata — names (transliterated identifiers),
+// IDs, photo file ids, brand colour, skill tags, and contact info.
+// The translatable parts (role, bio) come from `t.team.members.<id>`.
+const TEAM_META = [
   {
-    id: 1,
-    name: 'Аким Омар',
+    id: '1',
+    name:   'Аким Омар',
     nameEn: 'Akim Omar',
-    role: 'Project Lead & Full-Stack Developer',
     studentId: '34732',
-    university: 'IITU — International Information Technology University',
-    bio: 'Дипломдық жобаның жетекшісі және негізгі әзірлеушісі. AegisAI — ақылды үй қауіпсіздігін зерттеуге арналған интерактивті AI Red Teaming Battle Simulator жобасын дайындады.\n\nSpecializes in AI systems, cybersecurity research, and interactive 3D visualization. Passionate about exploring how adversarial AI agents can stress-test smart-home IoT security.',
     skills: ['Python', 'FastAPI', 'React', 'Next.js', 'Three.js', 'AI/ML', 'Cybersecurity', 'WebSocket'],
     contacts: {
       email: '34732@iitu.edu.kz',
@@ -22,13 +23,10 @@ const TEAM_MEMBERS = [
     color: '#00E5FF',
   },
   {
-    id: 2,
-    name: 'Тажибаев Арнур',
+    id: '2',
+    name:   'Тажибаев Арнур',
     nameEn: 'Tazhibayev Arnur',
-    role: 'AI Red Team Analyst',
     studentId: 'IITU Student',
-    university: 'IITU — International Information Technology University',
-    bio: 'Жоба бойынша шабуыл сценарийлері мен агенттік стратегияларды зерттейді. Негізгі бағыты — prompt injection және context poisoning шабуылдарының нақты әсерін көрсету.\n\nFocus: сценарий сапасын көтеру, Learning Journey контентін толықтыру және шабуыл визуализациясын қолданбалы ету.',
     skills: ['Cybersecurity', 'Prompt Engineering', 'Threat Modeling', 'LLM Safety', 'IoT Security'],
     contacts: {
       email: '34312@iitu.edu.kz',
@@ -38,13 +36,10 @@ const TEAM_MEMBERS = [
     color: '#FF9F0A',
   },
   {
-    id: 3,
-    name: 'Кайсенов Жанторе',
+    id: '3',
+    name:   'Кайсенов Жанторе',
     nameEn: 'Kaisenov Zhantore',
-    role: '3D & IoT Prototype Developer',
     studentId: 'IITU Student',
-    university: 'IITU — International Information Technology University',
-    bio: '3D сахналар, IoT объект модельдері және интерактивті прототип беттерін әзірлеуге жауапты. Smart Home визуалын реалистік деңгейге жақындату бойынша жұмыс істейді.\n\nFocus: battle/view беттерінде объект сапасын арттыру және пайдаланушы командалары арқылы IoT құрылғыларын басқару прототипін дамыту.',
     skills: ['Three.js', 'React', 'UI/UX', 'IoT Systems', 'Frontend Architecture'],
     contacts: {
       email: '34289@iitu.edu.kz',
@@ -55,24 +50,17 @@ const TEAM_MEMBERS = [
   },
 ];
 
-const PROJECT_INFO = {
-  title: 'AegisAI — Smart Home Red Teaming Simulator',
-  type: 'Diploma Project',
-  year: '2026',
-  university: 'International Information Technology University (IITU)',
-  description:
-    'An interactive AI-driven cybersecurity simulator that deploys adversarial AI agents to stress-test a simulated smart-home IoT environment. The system evaluates LLM responses to prompt injection, context manipulation, and privilege escalation attacks — providing real-time risk scoring and analytics.',
-  technologies: [
-    { name: 'Frontend', tech: 'Next.js 14 + React 18 + Three.js + Framer Motion' },
-    { name: 'Backend', tech: 'FastAPI + Python + WebSocket' },
-    { name: 'AI/LLM', tech: 'Groq (Llama 3.3) · Gemini · OpenRouter · GPT-4o' },
-    { name: '3D Scene', tech: '@react-three/fiber + @react-three/drei + postprocessing' },
-    { name: 'Analytics', tech: 'Recharts + Real-time WebSocket data' },
-    { name: 'Security', tech: 'Policy Engine + Risk Scoring + Stealth model' },
-  ],
-};
+// Non-translatable technology stack (technical strings).
+const PROJECT_TECHS = [
+  { name: 'Frontend',  tech: 'Next.js 14 + React 18 + Three.js + Framer Motion' },
+  { name: 'Backend',   tech: 'FastAPI + Python + WebSocket' },
+  { name: 'AI/LLM',    tech: 'Groq (Llama 3.3) · Gemini · OpenRouter · GPT-4o' },
+  { name: '3D Scene',  tech: '@react-three/fiber + @react-three/drei + postprocessing' },
+  { name: 'Analytics', tech: 'Recharts + Real-time WebSocket data' },
+  { name: 'Security',  tech: 'Policy Engine + Risk Scoring + Stealth model' },
+];
 
-function MemberCard({ member, index }) {
+function MemberCard({ member, translated, index, skillsLabel }) {
   const [photoError, setPhotoError] = useState(false);
   return (
     <motion.div
@@ -117,24 +105,24 @@ function MemberCard({ member, index }) {
               background: `${member.color}1F`, border: `1px solid ${member.color}55`,
               borderRadius: 6, color: member.color, fontSize: 12, fontWeight: 600,
             }}>
-              {member.role}
+              {translated.role}
             </div>
             <div className="wv-body" style={{ fontSize: 12, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
               <GraduationCap size={12} color="var(--wv-text-2)" />
-              {member.university} · ID {member.studentId}
+              {member.contacts.university} · ID {member.studentId}
             </div>
           </div>
         </div>
 
         {/* Bio */}
         <p className="wv-body" style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-line' }}>
-          {member.bio}
+          {translated.bio}
         </p>
 
         {/* Skills */}
         <div>
           <div className="wv-eyebrow" style={{ marginBottom: 8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Code size={11} /> Skills
+            <Code size={11} /> {skillsLabel}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {member.skills.map((s) => (
@@ -174,6 +162,9 @@ function MemberCard({ member, index }) {
 }
 
 export default function TeamPage() {
+  const { t } = useLang();
+  const tm = t.team;
+
   return (
     <div className="wv">
       <NavBar />
@@ -183,40 +174,40 @@ export default function TeamPage() {
         <div className="wv-page-header">
           <div>
             <div className="wv-eyebrow" style={{ marginBottom: 6, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <User size={11} /> our team
+              <User size={11} /> {tm.eyebrow}
             </div>
-            <h1 className="wv-h1">Project Team</h1>
+            <h1 className="wv-h1">{tm.title}</h1>
             <p className="wv-body" style={{ marginTop: 8, maxWidth: 760 }}>
-              {PROJECT_INFO.year} · {PROJECT_INFO.type} · {PROJECT_INFO.university}
+              {tm.info.year} · {tm.info.type} · {tm.info.university}
             </p>
           </div>
           <Link href="/battle" className="wv-btn wv-btn-primary">
             <Play size={14} strokeWidth={2.5} />
-            Try Simulation
+            {tm.tryBtn}
           </Link>
         </div>
 
         {/* Project info card */}
         <div className="wv-card" style={{ marginBottom: 16 }}>
-          <div className="wv-eyebrow" style={{ marginBottom: 8 }}>About the project</div>
-          <h2 className="wv-h2" style={{ marginBottom: 8 }}>{PROJECT_INFO.title}</h2>
+          <div className="wv-eyebrow" style={{ marginBottom: 8 }}>{tm.about}</div>
+          <h2 className="wv-h2" style={{ marginBottom: 8 }}>{tm.info.title}</h2>
           <p className="wv-body" style={{ fontSize: 14, lineHeight: 1.7, marginBottom: 16 }}>
-            {PROJECT_INFO.description}
+            {tm.info.description}
           </p>
 
-          <div className="wv-eyebrow" style={{ marginBottom: 12 }}>Technology stack</div>
+          <div className="wv-eyebrow" style={{ marginBottom: 12 }}>{tm.techStack}</div>
           <div className="wv-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 8 }}>
-            {PROJECT_INFO.technologies.map((t) => (
-              <div key={t.name} style={{
+            {PROJECT_TECHS.map((row) => (
+              <div key={row.name} style={{
                 padding: 12,
                 background: 'var(--wv-bg)',
                 border: '1px solid var(--wv-border)',
                 borderRadius: 10,
               }}>
                 <div className="wv-mono" style={{ fontSize: 10, color: 'var(--wv-cyan)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-                  {t.name}
+                  {row.name}
                 </div>
-                <div className="wv-body" style={{ fontSize: 13, color: 'var(--wv-text)' }}>{t.tech}</div>
+                <div className="wv-body" style={{ fontSize: 13, color: 'var(--wv-text)' }}>{row.tech}</div>
               </div>
             ))}
           </div>
@@ -224,9 +215,14 @@ export default function TeamPage() {
 
         {/* Team grid */}
         <div className="wv-grid">
-          {TEAM_MEMBERS.map((m, i) => (
+          {TEAM_META.map((m, i) => (
             <div key={m.id} className="wv-col-4">
-              <MemberCard member={m} index={i} />
+              <MemberCard
+                member={m}
+                translated={tm.members[m.id]}
+                index={i}
+                skillsLabel={tm.skills}
+              />
             </div>
           ))}
         </div>

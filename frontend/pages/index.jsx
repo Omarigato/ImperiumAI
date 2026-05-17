@@ -14,8 +14,8 @@ const HomeHero3D = dynamic(
     import('../components/HomeHero3D').catch((err) => {
       if (typeof window !== 'undefined' && /ChunkLoadError|Loading chunk/i.test(String(err))) {
         // One-shot reload to pick up the fresh chunk after a dev rebuild.
-        if (!sessionStorage.getItem('aegis-3d-reloaded')) {
-          sessionStorage.setItem('aegis-3d-reloaded', '1');
+        if (!sessionStorage.getItem('imperium-3d-reloaded')) {
+          sessionStorage.setItem('imperium-3d-reloaded', '1');
           window.location.reload();
           return { default: () => null };
         }
@@ -134,18 +134,18 @@ export default function IndexPage() {
         {/* ── KPI Row ─────────────────────────────────────────────────── */}
         <div className="wv-grid" style={{ marginBottom: 16 }}>
           <div className="wv-col-3">
-            <KpiCard icon={Bot}      label="AI Red-Team Agents" value={5} />
+            <KpiCard icon={Bot}      label={h.kpiAgents}  value={5} />
           </div>
           <div className="wv-col-3">
-            <KpiCard icon={Skull}    label="Attack Tactics"     value={22} />
+            <KpiCard icon={Skull}    label={h.kpiTactics} value={22} />
           </div>
           <div className="wv-col-3">
-            <KpiCard icon={Network}  label="IoT Devices"        value={7} />
+            <KpiCard icon={Network}  label={h.kpiDevices} value={7} />
           </div>
           <div className="wv-col-3">
             <KpiCard
               icon={Zap}
-              label="Active LLM Providers"
+              label={h.kpiLLMs}
               value={availableLLMs || 4}
               tone="green"
             />
@@ -159,11 +159,14 @@ export default function IndexPage() {
             <div className="wv-card" style={{ padding: 0, overflow: 'hidden', height: 460, position: 'relative' }}>
               <div style={{ position: 'absolute', top: 16, left: 20, zIndex: 2 }}>
                 <span className="wv-badge wv-badge-green">
-                  <span className="wv-live-dot" /> Live Simulation
+                  <span className="wv-live-dot" /> {h.liveSim}
                 </span>
-                <div className="wv-h3" style={{ marginTop: 8 }}>Smart Home Battle Arena</div>
+                <div className="wv-h3" style={{ marginTop: 8 }}>{h.arenaTitle}</div>
                 <div className="wv-body" style={{ marginTop: 4 }}>
-                  5 adversarial AI agents · 22 attack tactics · {availableLLMs || '–'} LLM providers
+                  {h.arenaSub
+                    .replace('{agents}', 5)
+                    .replace('{tactics}', 22)
+                    .replace('{llms}', availableLLMs || '–')}
                 </div>
               </div>
               <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
@@ -172,7 +175,7 @@ export default function IndexPage() {
               <div style={{ position: 'absolute', bottom: 16, right: 16, zIndex: 2 }}>
                 <Link href="/battle" className="wv-btn wv-btn-primary">
                   <Play size={14} strokeWidth={2.5} />
-                  Start Battle
+                  {h.startBattleBtn}
                 </Link>
               </div>
             </div>
@@ -183,22 +186,22 @@ export default function IndexPage() {
             <div className="wv-card">
               <div className="wv-eyebrow" style={{ marginBottom: 10 }}>
                 <Activity size={11} style={{ display: 'inline', marginRight: 6, verticalAlign: '-1px' }} />
-                System Status
+                {h.sysStatus}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <Row label="Backend" status={llmStatus ? 'online' : 'offline'} />
-                <Row label="Active LLM" value={(llmStatus?.active || '—').toUpperCase()} />
-                <Row label="Multi-LLM Mode" value={llmStatus?.multi_llm ? 'ENABLED' : 'OFF'} status={llmStatus?.multi_llm ? 'online' : null} />
+                <Row label={h.backendLabel} status={llmStatus ? 'online' : 'offline'} onlineLabel={h.online} offlineLabel={h.offline} />
+                <Row label={h.activeLLM} value={(llmStatus?.active || '—').toUpperCase()} />
+                <Row label={h.multiLLMMode} value={llmStatus?.multi_llm ? h.enabled : h.off} status={llmStatus?.multi_llm ? 'online' : null} onlineLabel={h.enabled} />
               </div>
             </div>
 
             <div className="wv-alert wv-alert-info">
-              <strong>Research Goal:</strong>
+              <strong>{h.researchGoal}</strong>
               <div style={{ marginTop: 6, color: 'rgba(255,255,255,0.85)' }}>{h.goalText}</div>
             </div>
 
             <div className="wv-alert wv-alert-warning">
-              <strong>Research Method:</strong>
+              <strong>{h.researchMethod}</strong>
               <div style={{ marginTop: 6, color: 'rgba(255,255,255,0.85)' }}>{h.descText}</div>
             </div>
           </div>
@@ -244,9 +247,9 @@ export default function IndexPage() {
 
         {/* ── Final CTA ──────────────────────────────────────────────── */}
         <div className="wv-card wv-card-featured" style={{ textAlign: 'center', padding: '32px 24px' }}>
-          <div className="wv-eyebrow" style={{ color: 'var(--wv-cyan)' }}>READY?</div>
+          <div className="wv-eyebrow" style={{ color: 'var(--wv-cyan)' }}>{h.readyEyebrow}</div>
           <h2 className="wv-h2" style={{ marginTop: 8, marginBottom: 16 }}>
-            Witness 5 AI agents stress-test a smart home in real time
+            {h.ctaTitle}
           </h2>
           <Link href="/battle" className="wv-btn wv-btn-primary wv-btn-lg">
             <Play size={16} strokeWidth={2.5} />
@@ -259,7 +262,7 @@ export default function IndexPage() {
 }
 
 // ── Row helper ──────────────────────────────────────────────────────────────
-function Row({ label, value, status }) {
+function Row({ label, value, status, onlineLabel = 'ONLINE', offlineLabel = 'OFFLINE' }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13 }}>
       <span style={{ color: 'var(--wv-text-2)' }}>{label}</span>
@@ -267,7 +270,7 @@ function Row({ label, value, status }) {
         {status === 'online' && <span className="wv-live-dot" />}
         {status === 'offline' && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--wv-red)' }} />}
         <span className="wv-mono" style={{ color: status === 'online' ? 'var(--wv-green)' : status === 'offline' ? 'var(--wv-red)' : 'var(--wv-text)', fontSize: 12, fontWeight: 600 }}>
-          {value || (status === 'online' ? 'ONLINE' : status === 'offline' ? 'OFFLINE' : '—')}
+          {value || (status === 'online' ? onlineLabel : status === 'offline' ? offlineLabel : '—')}
         </span>
       </span>
     </div>

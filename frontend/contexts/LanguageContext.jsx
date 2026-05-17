@@ -16,7 +16,7 @@ import kz from '../locales/kz.json';
 const DICTIONARIES = { en, ru, kz };
 const SUPPORTED_LANGS = Object.keys(DICTIONARIES);
 const DEFAULT_LANG = 'en';
-const STORAGE_KEY = 'aegis-lang';
+const STORAGE_KEY = 'imperium-lang';
 
 export const LanguageContext = createContext(null);
 

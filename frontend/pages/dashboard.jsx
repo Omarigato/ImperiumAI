@@ -7,6 +7,7 @@ import {
 import { motion } from 'framer-motion';
 import { RefreshCw, AlertTriangle, TrendingUp, Target, Zap, Activity, Database, Skull } from 'lucide-react';
 import NavBar from '../components/NavBar';
+import { useLang } from '../contexts/LanguageContext';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -64,6 +65,8 @@ function ChartCard({ title, subtitle, icon: Icon, children, height = 240 }) {
 }
 
 export default function DashboardPage() {
+  const { t } = useLang();
+  const d = t.dashboard;
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -143,29 +146,29 @@ export default function DashboardPage() {
       <div className="wv-page">
         <div className="wv-page-header">
           <div>
-            <div className="wv-eyebrow" style={{ marginBottom: 6 }}>analytics dashboard</div>
-            <h1 className="wv-h1">Attack Telemetry</h1>
+            <div className="wv-eyebrow" style={{ marginBottom: 6 }}>{d.eyebrow}</div>
+            <h1 className="wv-h1">{d.title}</h1>
             <p className="wv-body" style={{ marginTop: 8 }}>
-              Real-time analytics from the AegisAI red-team simulator. Data refreshes every 5 s.
+              {d.subtitle}
             </p>
           </div>
           <button onClick={fetchData} className="wv-btn wv-btn-ghost">
             <RefreshCw size={14} />
-            Refresh
+            {d.refresh}
           </button>
         </div>
 
         {loading && !summary && (
           <div className="wv-card" style={{ textAlign: 'center', padding: 48, color: 'var(--wv-text-2)' }}>
-            Loading analytics…
+            {d.loading}
           </div>
         )}
 
         {error && (
           <div className="wv-alert">
-            <strong>Connection error:</strong> {error}
+            <strong>{d.connectionError.replace('{error}', '')}</strong> {error}
             <div style={{ marginTop: 4, color: 'rgba(255,255,255,0.85)' }}>
-              Make sure the backend is running on port 8000.
+              {d.connectionHint}
             </div>
           </div>
         )}
@@ -175,17 +178,17 @@ export default function DashboardPage() {
             {/* ── KPI Row ─────────────────────────────────────────────── */}
             <div className="wv-grid" style={{ marginBottom: 16 }}>
               <div className="wv-col-3">
-                <KpiCard label="Total Attacks" value={summary.total_attacks} icon={Database} tone="cyan" />
+                <KpiCard label={d.totalAttacks} value={summary.total_attacks} icon={Database} tone="cyan" />
               </div>
               <div className="wv-col-3">
-                <KpiCard label="Successful" value={summary.successful_attacks} icon={AlertTriangle} tone="red" />
+                <KpiCard label={d.successful} value={summary.successful_attacks} icon={AlertTriangle} tone="red" />
               </div>
               <div className="wv-col-3">
-                <KpiCard label="Blocked" value={summary.blocked_attacks} icon={Zap} tone="green" />
+                <KpiCard label={d.blocked} value={summary.blocked_attacks} icon={Zap} tone="green" />
               </div>
               <div className="wv-col-3">
                 <KpiCard
-                  label="Success Rate"
+                  label={d.successRate}
                   value={`${Math.round(summary.success_rate * 100)}%`}
                   icon={TrendingUp}
                   tone={summary.success_rate > 0.5 ? 'red' : 'cyan'}
@@ -196,7 +199,7 @@ export default function DashboardPage() {
             {/* ── Charts row 1 ────────────────────────────────────────── */}
             <div className="wv-grid" style={{ marginBottom: 16 }}>
               <div className="wv-col-6">
-                <ChartCard title="Tactic Performance" subtitle="Win / loss per attack tactic" icon={Activity}>
+                <ChartCard title={d.tacticPerformance} subtitle={d.tacticSubtitle} icon={Activity}>
                   {tacticData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={tacticData} margin={{ top: 0, right: 10, bottom: 28, left: -10 }}>
@@ -213,7 +216,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="wv-col-6">
-                <ChartCard title="Target Vulnerability" subtitle="% of attacks succeeded per device" icon={Target}>
+                <ChartCard title={d.targetVulnerability} subtitle={d.targetSubtitle} icon={Target}>
                   {targetData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={targetData} layout="vertical" margin={{ top: 0, right: 20, bottom: 0, left: 70 }}>
@@ -232,7 +235,7 @@ export default function DashboardPage() {
             {/* ── Charts row 2 ────────────────────────────────────────── */}
             <div className="wv-grid" style={{ marginBottom: 16 }}>
               <div className="wv-col-6">
-                <ChartCard title="Attack Timeline" subtitle="Risk delta and outcomes over rounds" icon={TrendingUp}>
+                <ChartCard title={d.attackTimeline} subtitle={d.timelineSubtitle} icon={TrendingUp}>
                   {timelineData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={timelineData} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
@@ -250,7 +253,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="wv-col-6">
-                <ChartCard title="Agent Performance" subtitle="Success rate by red-team agent" icon={Skull}>
+                <ChartCard title={d.agentPerformance} subtitle={d.agentSubtitle} icon={Skull}>
                   {agentData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <RadarChart data={agentData}>
@@ -269,7 +272,7 @@ export default function DashboardPage() {
             {/* ── Charts row 3 ────────────────────────────────────────── */}
             <div className="wv-grid" style={{ marginBottom: 16 }}>
               <div className="wv-col-6">
-                <ChartCard title="Cumulative Risk Progression" subtitle="Running risk score over all attacks" icon={AlertTriangle}>
+                <ChartCard title={d.cumulativeRisk} subtitle={d.cumulativeSubtitle} icon={AlertTriangle}>
                   {cumulativeRiskData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={cumulativeRiskData} margin={{ top: 5, right: 10, bottom: 5, left: -10 }}>
@@ -294,10 +297,10 @@ export default function DashboardPage() {
                 <div className="wv-card">
                   <div className="wv-eyebrow" style={{ marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <Activity size={11} strokeWidth={2.2} />
-                    Attack Category Effectiveness
+                    {d.categoryEffectiveness}
                   </div>
                   <div className="wv-body" style={{ fontSize: 12, marginBottom: 16 }}>
-                    Bypass rate grouped by attack strategy
+                    {d.categorySubtitle}
                   </div>
                   {categoryStats.some((c) => c.total > 0) ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -306,9 +309,9 @@ export default function DashboardPage() {
                         return (
                           <div key={c.category}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                              <span className="wv-h4" style={{ fontSize: 13 }}>{c.category}</span>
+                              <span className="wv-h4" style={{ fontSize: 13 }}>{d.categories[c.category] || c.category}</span>
                               <span className="wv-mono" style={{ color: tone, fontSize: 12, fontWeight: 600 }}>
-                                {c.rate}% bypass {c.total > 0 ? `(${c.wins}/${c.total})` : '(no data)'}
+                                {c.rate}% · {c.total > 0 ? `${c.wins}/${c.total}` : '—'}
                               </span>
                             </div>
                             <div style={{ width: '100%', height: 6, background: 'var(--wv-bg)', borderRadius: 3, overflow: 'hidden' }}>
@@ -323,15 +326,15 @@ export default function DashboardPage() {
                         );
                       })}
                     </div>
-                  ) : <EmptyState message="Run a battle first" />}
+                  ) : <EmptyState message={d.noData} />}
                 </div>
               </div>
             </div>
 
             {/* ── Research Metrics ────────────────────────────────────── */}
             <div className="wv-card" style={{ marginBottom: 16 }}>
-              <div className="wv-eyebrow" style={{ marginBottom: 4 }}>research metrics</div>
-              <h3 className="wv-h3" style={{ marginBottom: 16 }}>LLM Security Robustness Indicators</h3>
+              <div className="wv-eyebrow" style={{ marginBottom: 4 }}>{d.researchEyebrow}</div>
+              <h3 className="wv-h3" style={{ marginBottom: 16 }}>{d.researchMetrics}</h3>
               <div className="wv-grid" style={{ marginBottom: 16 }}>
                 <div className="wv-col-3">
                   <div style={{ padding: 16, background: 'var(--wv-bg)', borderRadius: 12, border: '1px solid var(--wv-border)' }}>
@@ -339,7 +342,7 @@ export default function DashboardPage() {
                       {summary.total_attacks > 0 ? Math.round(summary.success_rate * 100) : 0}
                       <span style={{ fontSize: 16 }}>%</span>
                     </div>
-                    <div className="wv-kpi-label">LLM Bypass Rate</div>
+                    <div className="wv-kpi-label">{d.bypassRate}</div>
                   </div>
                 </div>
                 <div className="wv-col-3">
@@ -348,13 +351,13 @@ export default function DashboardPage() {
                       {summary.total_attacks > 0 ? Math.round((1 - summary.success_rate) * 100) : 0}
                       <span style={{ fontSize: 16 }}>%</span>
                     </div>
-                    <div className="wv-kpi-label">Defense Rate</div>
+                    <div className="wv-kpi-label">{d.defenseRate}</div>
                   </div>
                 </div>
                 <div className="wv-col-3">
                   <div style={{ padding: 16, background: 'var(--wv-bg)', borderRadius: 12, border: '1px solid var(--wv-border)' }}>
                     <div className="wv-kpi-value" style={{ fontSize: 26 }}>{summary.total_attacks}</div>
-                    <div className="wv-kpi-label">Total Probes</div>
+                    <div className="wv-kpi-label">{d.totalProbes}</div>
                   </div>
                 </div>
                 <div className="wv-col-3">
@@ -362,17 +365,8 @@ export default function DashboardPage() {
                     <div className="wv-kpi-value" style={{ fontSize: 26, color: 'var(--wv-violet)' }}>
                       {summary.most_successful_tactics?.length || 0}
                     </div>
-                    <div className="wv-kpi-label">Tactic Variants</div>
+                    <div className="wv-kpi-label">{d.tacticVariants}</div>
                   </div>
-                </div>
-              </div>
-              <div className="wv-alert wv-alert-info" style={{ fontSize: 13 }}>
-                <strong>Research context:</strong>
-                <div style={{ marginTop: 6, color: 'rgba(255,255,255,0.85)' }}>
-                  This framework systematically tests LLM robustness against adversarial prompts in IoT contexts.
-                  A high bypass rate indicates the LLM is vulnerable to prompt injection, context manipulation,
-                  or privilege escalation attacks. Adaptive agents exploit memory of prior successful tactics,
-                  simulating real-world red-team learning behaviour.
                 </div>
               </div>
             </div>
@@ -381,22 +375,22 @@ export default function DashboardPage() {
             <div className="wv-card">
               <div className="wv-eyebrow" style={{ marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <Database size={11} strokeWidth={2.2} />
-                Recent Attack Log
+                {d.recentLog}
               </div>
               <div className="wv-body" style={{ fontSize: 12, marginBottom: 16 }}>
-                Last 20 recorded attacks
+                {d.recentSubtitle}
               </div>
 
               <div style={{ overflowX: 'auto' }}>
                 <table className="wv-table">
                   <thead>
                     <tr>
-                      <th>#</th>
-                      <th>Agent</th>
-                      <th>Target</th>
-                      <th>Tactic</th>
-                      <th>Result</th>
-                      <th style={{ textAlign: 'right' }}>Risk Δ</th>
+                      <th>{d.table.num}</th>
+                      <th>{d.table.agent}</th>
+                      <th>{d.table.target}</th>
+                      <th>{d.table.tactic}</th>
+                      <th>{d.table.result}</th>
+                      <th style={{ textAlign: 'right' }}>{d.table.delta}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -412,9 +406,9 @@ export default function DashboardPage() {
                         </td>
                         <td>
                           {entry.success ? (
-                            <span className="wv-badge wv-badge-red">BREACH</span>
+                            <span className="wv-badge wv-badge-red">{t.battle.breach}</span>
                           ) : (
-                            <span className="wv-badge wv-badge-green">BLOCKED</span>
+                            <span className="wv-badge wv-badge-green">{t.battle.block}</span>
                           )}
                         </td>
                         <td className="wv-mono" style={{ textAlign: 'right', color: entry.risk_delta > 0 ? 'var(--wv-orange)' : 'var(--wv-green)', fontWeight: 600 }}>
@@ -426,7 +420,7 @@ export default function DashboardPage() {
                 </table>
                 {(!summary.history || summary.history.length === 0) && (
                   <div style={{ textAlign: 'center', padding: 32, color: 'var(--wv-text-2)' }}>
-                    No attacks recorded yet
+                    {d.noData}
                   </div>
                 )}
               </div>

@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 FROM python:3.11-slim AS runtime
 
 # Security: run as non-root
-RUN groupadd -r aegis && useradd -r -g aegis -d /app -s /sbin/nologin aegis
+RUN groupadd -r imperium && useradd -r -g imperium -d /app -s /sbin/nologin imperium
 
 WORKDIR /app
 
@@ -38,9 +38,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 COPY . .
 
 # Create data directory and fix permissions
-RUN mkdir -p /app/data && chown -R aegis:aegis /app
+RUN mkdir -p /app/data && chown -R imperium:imperium /app
 
-USER aegis
+USER imperium
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \

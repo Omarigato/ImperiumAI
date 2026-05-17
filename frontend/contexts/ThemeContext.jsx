@@ -7,7 +7,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 
 export const THEMES = ['dark', 'light', 'bw'];
 const DEFAULT_THEME = 'dark';
-const STORAGE_KEY = 'aegis-theme';
+const STORAGE_KEY = 'imperium-theme';
 
 const ThemeContext = createContext(null);
 

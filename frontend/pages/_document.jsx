@@ -13,7 +13,7 @@ import { Html, Head, Main, NextScript } from 'next/document';
 const PRE_HYDRATION_SCRIPT = `
 (function () {
   try {
-    var t = localStorage.getItem('aegis-theme');
+    var t = localStorage.getItem('imperium-theme');
     if (t === 'light' || t === 'bw') {
       document.documentElement.setAttribute('data-theme', t);
     } else {

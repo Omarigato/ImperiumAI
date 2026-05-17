@@ -40,9 +40,9 @@ export default function NavBar({ live = false, currentRound = 0 }) {
     <nav className="wv-nav">
       <div className="wv-nav-inner">
         {/* Logo */}
-        <Link href="/" className="wv-nav-logo">
+        <Link href="/" className="wv-nav-logo" title="Imperium AI — Red Teaming Framework">
           <Zap size={18} strokeWidth={2.5} />
-          <span>AegisAI</span>
+          <span>Imperium AI</span>
         </Link>
 
         {/* Links */}

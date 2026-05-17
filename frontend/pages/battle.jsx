@@ -30,6 +30,7 @@ import AttackPipeline from '../components/AttackPipeline';
 import SceneTooltip from '../components/SceneTooltip';
 import { AGENTS as AGENT_META } from '../components/meta/agents';
 import wsService from '../services/websocket';
+import { useLang } from '../contexts/LanguageContext';
 
 // 3D battle scene — heavy WebGL, client-only. Auto-recover from dev-only
 // stale-chunk errors after a hot rebuild.
@@ -37,8 +38,8 @@ const SmartHome3D = dynamic(
   () =>
     import('../components/SmartHome3D').catch((err) => {
       if (typeof window !== 'undefined' && /ChunkLoadError|Loading chunk/i.test(String(err))) {
-        if (!sessionStorage.getItem('aegis-battle-3d-reloaded')) {
-          sessionStorage.setItem('aegis-battle-3d-reloaded', '1');
+        if (!sessionStorage.getItem('imperium-battle-3d-reloaded')) {
+          sessionStorage.setItem('imperium-battle-3d-reloaded', '1');
           window.location.reload();
           return { default: () => null };
         }
@@ -75,6 +76,9 @@ const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const MAX_LOGS = 100;
 
 export default function BattlePage() {
+  const { t } = useLang();
+  const b = t.battle;
+
   // ── connection / battle state ────────────────────────────────────────────
   const [connected, setConnected] = useState(false);
   const [running, setRunning] = useState(false);
@@ -389,40 +393,40 @@ export default function BattlePage() {
             <button onClick={startSimulation} disabled={running}
               className={`wv-btn ${running ? 'wv-btn-ghost' : 'wv-btn-primary'} wv-btn-sm`}
               style={{ minWidth: 140, flex: '0 0 auto' }}>
-              <Play size={13} strokeWidth={2.5} /> {running ? 'In progress…' : 'Start Battle'}
+              <Play size={13} strokeWidth={2.5} /> {running ? b.inProgress : b.start}
             </button>
             <button onClick={resetSimulation} className="wv-btn wv-btn-ghost wv-btn-sm" style={{ flex: '0 0 auto' }}>
-              <RotateCcw size={13} /> Reset
+              <RotateCcw size={13} /> {b.reset}
             </button>
             <button onClick={handleRaiseShield} disabled={!running || shieldCooldown || shieldActive}
               className={`wv-btn ${shieldActive ? 'wv-btn-success' : 'wv-btn-ghost'} wv-btn-sm`}
               style={{ flex: '0 0 auto' }}>
               <Shield size={13} />
-              {shieldActive ? `Shield · ${shieldRoundsLeft}r` : shieldCooldown ? 'Cooldown' : 'Shield'}
+              {shieldActive ? b.shieldActive.replace('{rounds}', shieldRoundsLeft) : shieldCooldown ? b.shieldCooldown : b.shield}
             </button>
             <button onClick={handleResetRisk} disabled={!running || riskResetting}
               className="wv-btn wv-btn-outline wv-btn-sm" style={{ flex: '0 0 auto' }}>
-              <RefreshCcw size={13} /> {riskResetting ? 'Deploying…' : 'Counter'}
+              <RefreshCcw size={13} /> {riskResetting ? b.deploying : b.counter}
             </button>
 
             <SceneToggle on={performanceMode} onClick={() => setPerformanceMode((v) => !v)}
               icon={Cpu} title="Toggle low-performance render (no post-FX, no reflections)">
-              Perf: {performanceMode ? 'low' : 'high'}
+              {performanceMode ? b.perfLow : b.perfHigh}
             </SceneToggle>
 
             <SceneToggle on={autoOrbit} onClick={() => setAutoOrbit((v) => !v)}
               icon={Orbit} title="Auto-orbit camera (off = orbit/zoom by mouse)">
-              {autoOrbit ? 'Auto-Orbit' : 'Manual'}
+              {autoOrbit ? b.autoOrbit : b.manual}
             </SceneToggle>
 
             <SceneToggle on={showLabels} onClick={() => setShowLabels((v) => !v)}
               icon={Tag} title="Always show labels for every device">
-              Labels
+              {b.labels}
             </SceneToggle>
 
             <SceneToggle on={focusMode} onClick={() => setFocusMode((v) => !v)}
               icon={Maximize2} title="Focus mode — hide all panels (F)">
-              Focus
+              {b.focusMode}
             </SceneToggle>
 
             <div style={{ flex: 1, minWidth: 8 }} />
@@ -431,10 +435,10 @@ export default function BattlePage() {
               R <span className="wv-mono" style={{ color: 'var(--wv-cyan)', marginLeft: 4 }}>{round}</span>
             </span>
             <span className="wv-badge wv-badge-red" style={{ flex: '0 0 auto' }}>
-              BREACH <span className="wv-mono" style={{ marginLeft: 4 }}>{stats.breaches}</span>
+              {b.breach} <span className="wv-mono" style={{ marginLeft: 4 }}>{stats.breaches}</span>
             </span>
             <span className="wv-badge wv-badge-green" style={{ flex: '0 0 auto' }}>
-              BLOCK <span className="wv-mono" style={{ marginLeft: 4 }}>{stats.defense}</span>
+              {b.block} <span className="wv-mono" style={{ marginLeft: 4 }}>{stats.defense}</span>
             </span>
           </div>
 
@@ -464,7 +468,7 @@ export default function BattlePage() {
             overflow: 'auto', minWidth: 0, minHeight: 0,
             zIndex: 30,
           }}>
-            <AgentsPanel agentStatuses={agentStatuses} activeAgent={activeAgent} />
+            <AgentsPanel agentStatuses={agentStatuses} activeAgent={activeAgent} label={b.redTeam} />
           </div>
         )}
 
@@ -537,13 +541,13 @@ export default function BattlePage() {
               }}>
                 <button onClick={startSimulation} disabled={running}
                   className={`wv-btn ${running ? 'wv-btn-ghost' : 'wv-btn-primary'} wv-btn-sm`}>
-                  <Play size={12} /> {running ? '…' : 'Start'}
+                  <Play size={12} /> {running ? '…' : b.start}
                 </button>
                 <button onClick={resetSimulation} className="wv-btn wv-btn-ghost wv-btn-sm">
-                  <RotateCcw size={12} /> Reset
+                  <RotateCcw size={12} /> {b.reset}
                 </button>
                 <button onClick={() => setFocusMode(false)} className="wv-btn wv-btn-outline wv-btn-sm">
-                  <Minimize2 size={12} /> Exit Focus <span style={{ opacity: 0.6, marginLeft: 4 }}>(Esc)</span>
+                  <Minimize2 size={12} /> {b.exitFocus} <span style={{ opacity: 0.6, marginLeft: 4 }}>(Esc)</span>
                 </button>
               </div>
             )}
@@ -565,7 +569,7 @@ export default function BattlePage() {
                 >
                   <div className="wv-eyebrow" style={{ marginBottom: 4, fontSize: 9 }}>
                     <Skull size={10} style={{ display: 'inline', marginRight: 3, verticalAlign: '-1px' }} />
-                    Active attack
+                    {b.activeAttack}
                   </div>
                   <div className="wv-mono" style={{ fontSize: 12, fontWeight: 700, color: 'var(--wv-red)' }}>
                     {activeAttack.agent} → {activeAttack.target}
@@ -610,7 +614,7 @@ export default function BattlePage() {
               <div className="wv-card" style={{ padding: 10, overflow: 'hidden' }}>
                 <div className="wv-eyebrow" style={{ marginBottom: 8 }}>
                   <Activity size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-                  Attack Pipeline
+                  {b.activePipeline}
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <AttackPipeline
@@ -630,7 +634,7 @@ export default function BattlePage() {
               }}>
                 <div className="wv-eyebrow" style={{ marginBottom: 8 }}>
                   <Zap size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: '-1px' }} />
-                  Risk Score
+                  {b.riskScore}
                 </div>
                 <RiskMeter score={riskScore} level={riskLevel} delta={riskDelta} compact />
               </div>
@@ -685,11 +689,11 @@ function SceneToggle({ on, onClick, icon: Icon, title, children }) {
 }
 
 // ── Left-side AgentsPanel ───────────────────────────────────────────────────
-function AgentsPanel({ agentStatuses, activeAgent }) {
+function AgentsPanel({ agentStatuses, activeAgent, label }) {
   return (
     <div style={{ height: '100%', overflow: 'auto', padding: 12 }}>
       <div className="wv-eyebrow" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Skull size={11} /> Red Team
+        <Skull size={11} /> {label}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {AGENT_META.map((agent) => {
