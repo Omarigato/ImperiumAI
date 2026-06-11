@@ -325,13 +325,29 @@ export default function BattlePage() {
   }, [resetSimulation, startSimulation]);
 
   const handleRaiseShield = useCallback(async () => {
-    if (shieldCooldown || !running) return;
+    if (shieldCooldown || shieldActive) return;
+
+    if (!running) {
+      // Demo preview: show the dome visually for 5 s without a live battle
+      setShieldActive(true);
+      setShieldRoundsLeft(3);
+      addLog('Defense', '🛡 SHIELD PREVIEW — dome raised (demo, 5s)', 'warning');
+      setShieldCooldown(true);
+      setTimeout(() => {
+        setShieldActive(false);
+        setShieldRoundsLeft(0);
+        addLog('Defense', '🔓 Shield preview ended', 'warning');
+      }, 5000);
+      setTimeout(() => setShieldCooldown(false), 8000);
+      return;
+    }
+
     try {
       await fetch(`${API}/api/defense/shield`, { method: 'POST' });
       setShieldCooldown(true);
       setTimeout(() => setShieldCooldown(false), 12000);
     } catch { addLog('System', 'Shield failed', 'error'); }
-  }, [running, shieldCooldown, addLog]);
+  }, [running, shieldCooldown, shieldActive, addLog]);
 
   const handleResetRisk = useCallback(async () => {
     if (riskResetting || !running) return;
@@ -410,24 +426,31 @@ export default function BattlePage() {
             display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
             background: 'var(--wv-bg)',
           }}>
-            <button onClick={startSimulation} disabled={running}
-              className={`wv-btn ${running ? 'wv-btn-ghost' : 'wv-btn-primary'} wv-btn-sm`}
-              style={{ minWidth: 140, flex: '0 0 auto' }}>
-              <Play size={13} strokeWidth={2.5} /> {running ? b.inProgress : b.start}
-            </button>
-            <button onClick={resetSimulation} className="wv-btn wv-btn-ghost wv-btn-sm" style={{ flex: '0 0 auto' }}>
-              <RotateCcw size={13} /> {b.reset}
-            </button>
-            <button onClick={handleRaiseShield} disabled={!running || shieldCooldown || shieldActive}
-              className={`wv-btn ${shieldActive ? 'wv-btn-success' : 'wv-btn-ghost'} wv-btn-sm`}
-              style={{ flex: '0 0 auto' }}>
-              <Shield size={13} />
-              {shieldActive ? b.shieldActive.replace('{rounds}', shieldRoundsLeft) : shieldCooldown ? b.shieldCooldown : b.shield}
-            </button>
-            <button onClick={handleResetRisk} disabled={!running || riskResetting}
-              className="wv-btn wv-btn-outline wv-btn-sm" style={{ flex: '0 0 auto' }}>
-              <RefreshCcw size={13} /> {riskResetting ? b.deploying : b.counter}
-            </button>
+            <Tooltip text={b.tipStart}>
+              <button onClick={startSimulation} disabled={running}
+                className={`wv-btn ${running ? 'wv-btn-ghost' : 'wv-btn-primary'} wv-btn-sm`}
+                style={{ minWidth: 140 }}>
+                <Play size={13} strokeWidth={2.5} /> {running ? b.inProgress : b.start}
+              </button>
+            </Tooltip>
+            <Tooltip text={b.tipReset}>
+              <button onClick={resetSimulation} className="wv-btn wv-btn-ghost wv-btn-sm">
+                <RotateCcw size={13} /> {b.reset}
+              </button>
+            </Tooltip>
+            <Tooltip text={b.tipShield}>
+              <button onClick={handleRaiseShield} disabled={shieldCooldown || shieldActive}
+                className={`wv-btn ${shieldActive ? 'wv-btn-success' : 'wv-btn-ghost'} wv-btn-sm`}>
+                <Shield size={13} />
+                {shieldActive ? b.shieldActive.replace('{rounds}', shieldRoundsLeft) : shieldCooldown ? b.shieldCooldown : b.shield}
+              </button>
+            </Tooltip>
+            <Tooltip text={b.tipCounter}>
+              <button onClick={handleResetRisk} disabled={!running || riskResetting}
+                className="wv-btn wv-btn-outline wv-btn-sm">
+                <RefreshCcw size={13} /> {riskResetting ? b.deploying : b.counter}
+              </button>
+            </Tooltip>
 
             <SpeedControl speed={speed} onChange={handleSetSpeed} label={b.speed || 'Speed'} />
 
@@ -720,6 +743,51 @@ export default function BattlePage() {
           <BattleResult result={battleResult} onPlayAgain={handlePlayAgain} onClose={() => setBattleResult(null)} />
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+// ── Tooltip wrapper ─────────────────────────────────────────────────────────
+function Tooltip({ text, children }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div
+      style={{ position: 'relative', display: 'inline-flex', flex: '0 0 auto' }}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      {children}
+      {show && text && (
+        <div style={{
+          position: 'absolute',
+          bottom: 'calc(100% + 8px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(8, 12, 26, 0.97)',
+          border: '1px solid var(--wv-border)',
+          borderRadius: 7,
+          padding: '6px 11px',
+          fontSize: 11,
+          fontFamily: 'Inter, sans-serif',
+          color: 'var(--wv-text)',
+          whiteSpace: 'nowrap',
+          zIndex: 300,
+          pointerEvents: 'none',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+        }}>
+          {text}
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 0, height: 0,
+            borderLeft: '5px solid transparent',
+            borderRight: '5px solid transparent',
+            borderTop: '5px solid rgba(8, 12, 26, 0.97)',
+          }} />
+        </div>
+      )}
     </div>
   );
 }

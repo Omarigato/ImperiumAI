@@ -121,7 +121,7 @@ export default function IndexPage() {
         <div style={{
           position: 'relative', zIndex: 2,
           textAlign: 'center',
-          padding: '0 24px',
+          padding: '2rem 24px 0',
           maxWidth: 980,
           width: '100%',
         }}>

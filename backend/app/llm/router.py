@@ -56,7 +56,7 @@ class LLMProvider(str, Enum):
 
 DEFAULT_MODELS: dict[LLMProvider, str] = {
     LLMProvider.GROQ: "llama-3.3-70b-versatile",
-    LLMProvider.OPENROUTER: "meta-llama/llama-3.1-8b-instruct:free",
+    LLMProvider.OPENROUTER: "meta-llama/llama-3.2-3b-instruct:free",
     LLMProvider.GEMINI: "gemini-2.0-flash",
     LLMProvider.OPENAI: "gpt-4o",
     LLMProvider.DEEPSEEK: "deepseek-chat",
@@ -73,7 +73,7 @@ AGENT_PROVIDER_MAP: dict[str, LLMProvider] = {
 
 AGENT_MODEL_OVERRIDES: dict[str, str] = {
     "SilentEscalator": "mixtral-8x7b-32768",
-    "NetworkPhantom":  "mistralai/mistral-7b-instruct:free",
+    "NetworkPhantom":  "meta-llama/llama-3.2-3b-instruct:free",
 }
 
 

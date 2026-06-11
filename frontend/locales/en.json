@@ -89,7 +89,11 @@
     "shieldExpired": "Shield expired",
     "counterDeployed": "COUNTERMEASURES DEPLOYED",
     "activeAttack": "Active attack",
-    "loadingScene": "Loading battle scene…"
+    "loadingScene": "Loading battle scene…",
+    "tipStart": "Launch 5 AI red-team agents to attack IoT devices via the active LLM defender",
+    "tipReset": "Stop the simulation and clear all battle data",
+    "tipShield": "Block all attacks for 3 rounds. Click while idle to preview the shield dome",
+    "tipCounter": "Deploy emergency countermeasures — reduce risk score by 20 points"
   },
   "dashboard": {
     "eyebrow": "analytics dashboard",
