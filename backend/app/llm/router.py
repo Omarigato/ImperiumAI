@@ -272,11 +272,13 @@ class LLMRouter:
         LLMProvider.DEEPSEEK: DeepSeekClient,
         LLMProvider.SIMULATION: SimulationClient,
     }
-    # Priority: free providers first
+    # Priority for auto-detection and fallback.
+    # Gemini/OpenRouter first because Groq free tier blocks cloud-server IPs
+    # (Render, AWS, etc.) — Groq is kept for local dev where it works fine.
     _PRIORITY = [
-        LLMProvider.GROQ,
         LLMProvider.GEMINI,
         LLMProvider.OPENROUTER,
+        LLMProvider.GROQ,
         LLMProvider.OPENAI,
         LLMProvider.DEEPSEEK,
     ]
@@ -329,10 +331,55 @@ class LLMRouter:
         provider, model = self._resolve(agent_name)
         client = self._get(provider)
         result = client.execute_command(prompt, model=model)
+
+        # If the provider returned an API-level error (network block, quota, etc.),
+        # try each remaining provider in priority order before falling back to simulation.
+        if self._is_api_error(result) and provider != LLMProvider.SIMULATION:
+            # Permanently disable providers that return auth errors (bad key / IP block)
+            # so we don't waste a round-trip on every subsequent call.
+            if self._is_auth_error(result):
+                client.available = False
+                logger.warning("%s auth error — marking unavailable for this session", provider.value)
+            else:
+                logger.warning("%s returned API error — trying fallback providers", provider.value)
+
+            for fallback_p in self._PRIORITY + [LLMProvider.SIMULATION]:
+                if fallback_p == provider:
+                    continue
+                fb_client = self._get(fallback_p)
+                if not fb_client.available:
+                    continue
+                fb_result = fb_client.execute_command(prompt)
+                if not self._is_api_error(fb_result):
+                    fb_result["_provider"] = fallback_p.value
+                    logger.info("Fell back from %s → %s", provider.value, fallback_p.value)
+                    return fb_result
+                if self._is_auth_error(fb_result):
+                    fb_client.available = False
+                    logger.warning("%s auth error — marking unavailable", fallback_p.value)
+
         result["_provider"] = provider.value
         if model:
             result["_model"] = model
         return result
+
+    @staticmethod
+    def _is_api_error(result: dict) -> bool:
+        """True when the result is an API failure, not a legitimate security denial."""
+        reasoning = result.get("reasoning", "")
+        return reasoning.endswith("API error") or reasoning == "JSON parse failed"
+
+    @staticmethod
+    def _is_auth_error(result: dict) -> bool:
+        """True for permanent auth failures — bad key, IP block, no balance."""
+        response = result.get("response", "").lower()
+        signals = [
+            "401", "403", "402",
+            "api key not found", "user not found", "access denied",
+            "invalid_api_key", "api_key_invalid", "insufficient balance",
+            "authentication", "unauthorized",
+        ]
+        return any(s in response for s in signals)
 
     def _resolve(self, agent_name: Optional[str]) -> tuple[LLMProvider, Optional[str]]:
         if self._multi_llm and agent_name:
