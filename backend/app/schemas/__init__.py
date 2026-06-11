@@ -37,6 +37,11 @@ class BatchBattleRequest(BaseModel):
     count: int = Field(default=3, ge=1, le=10)
 
 
+class BattleSpeedRequest(BaseModel):
+    """Live playback-speed multiplier for the battle pipeline (0.25×–4×)."""
+    speed: float = Field(default=1.0, ge=0.25, le=4.0)
+
+
 class IoTCommandRequest(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=2000)
 

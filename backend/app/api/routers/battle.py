@@ -13,7 +13,7 @@ from fastapi import APIRouter
 
 from app.core.container import get_container
 from app.iot.simulator import DEFAULT_BAD_ACTIONS
-from app.schemas import BatchBattleRequest
+from app.schemas import BatchBattleRequest, BattleSpeedRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["battle"])
@@ -26,11 +26,21 @@ _state: dict = {
     "stats": {"red_wins": 0, "defense_wins": 0, "total_rounds": 0},
     "shield_active": False,
     "shield_rounds_left": 0,
+    # Playback speed multiplier for the live battle (1.0 = documented pacing).
+    # Higher = faster, lower = slower. Lets the operator slow the battle down to
+    # actually watch each step, or speed it up. Does NOT change attack logic.
+    "speed": 1.0,
 }
 
 
 def get_state() -> dict:
     return _state
+
+
+async def _pause(seconds: float) -> None:
+    """Sleep, scaled by the live playback speed (clamped so it can't hang/zero)."""
+    speed = _state.get("speed") or 1.0
+    await asyncio.sleep(seconds / speed)
 
 
 # ── Single simulation round ────────────────────────────────────────────────────
@@ -55,7 +65,7 @@ async def run_round(round_num: int) -> dict:
         "llm_provider": llm_status["active"],
     })
     await ws.emit_log("AttackAgent", f"{agent.name} → [{tactic}] targeting {target}")
-    await asyncio.sleep(0.6)
+    await _pause(0.6)
 
     # ② LLM response
     llm_result = c.llm_router.execute_command(prompt, agent_name=agent.name)
@@ -78,18 +88,18 @@ async def run_round(round_num: int) -> dict:
         f"action={llm_result.get('action')} authorized={llm_result.get('authorized')} "
         f"— {llm_result.get('reasoning','')[:100]}",
     )
-    await asyncio.sleep(0.4)
+    await _pause(0.4)
 
     # ③ Policy check (shield override)
+    # If the shield is up, THIS round is intercepted. We decrement and report the
+    # remaining rounds, but keep the dome visible (shield_active) for the whole
+    # block window — the shield_expired event is only sent after this round's
+    # block has been visualised (see end of run_round).
     shield_applied = False
     if _state["shield_active"] and _state["shield_rounds_left"] > 0:
         _state["shield_rounds_left"] -= 1
         shield_applied = True
-        if _state["shield_rounds_left"] <= 0:
-            _state["shield_active"] = False
-            await ws.broadcast({"event": "shield_expired"})
-        else:
-            await ws.broadcast({"event": "shield_active", "rounds_left": _state["shield_rounds_left"]})
+        await ws.broadcast({"event": "shield_active", "rounds_left": _state["shield_rounds_left"]})
 
     if shield_applied:
         policy_result = {"violations": ["Shield active — all attacks intercepted"], "allowed": False, "severity": "none"}
@@ -104,7 +114,7 @@ async def run_round(round_num: int) -> dict:
             await ws.emit_log("Policy", f"BLOCKED — {policy_result['violations'][0]}", "warning")
         else:
             await ws.emit_log("Policy", "No violations — action permitted")
-    await asyncio.sleep(0.4)
+    await _pause(0.4)
 
     # ④ IoT execution
     if policy_result["allowed"]:
@@ -129,13 +139,13 @@ async def run_round(round_num: int) -> dict:
         "device_states": c.iot.get_device_states(),
     })
     await ws.emit_log("IoT", f"{target}: {iot_result['message']}")
-    await asyncio.sleep(0.3)
+    await _pause(0.3)
 
     # ⑤ Risk update
     attack_success = iot_result["success"]
     risk_result = c.risk.update_score(policy_result, iot_result, attack_success)
     await ws.broadcast({"event": "risk_update", **risk_result})
-    await asyncio.sleep(0.3)
+    await _pause(0.3)
 
     # ⑥ Memory + round complete
     c.memory.record_attack(agent.name, target, tactic, attack_success, risk_result["delta"])
@@ -152,6 +162,13 @@ async def run_round(round_num: int) -> dict:
     }
     await ws.broadcast(round_data)
     await ws.emit_log("System", f"Round {round_num} — {'🔥 BREACH' if attack_success else '🛡 BLOCKED'}")
+
+    # Shield consumed its final round this turn → drop the dome only now, after
+    # the block has been visualised, so it stays up for the whole 3-round window.
+    if shield_applied and _state["shield_rounds_left"] <= 0 and _state["shield_active"]:
+        _state["shield_active"] = False
+        await ws.broadcast({"event": "shield_expired"})
+
     return {**round_data, "agent_color": agent.avatar_color, "risk_result": risk_result}
 
 
@@ -195,7 +212,7 @@ async def run_simulation() -> None:
             _state["winner"] = "defense"
             break
 
-        await asyncio.sleep(cfg.round_delay_s)
+        await _pause(cfg.round_delay_s)
 
     if not _state["winner"]:
         s = _state["stats"]
@@ -254,9 +271,22 @@ async def get_status() -> dict:
         "round": _state["round"],
         "running": _state["running"],
         "winner": _state["winner"],
+        "speed": _state["speed"],
         "agents": [a.to_dict() for a in c.agents],
         "llm": c.llm_router.get_status(),
     }
+
+
+@router.post("/battle/speed")
+async def set_battle_speed(body: BattleSpeedRequest) -> dict:
+    """Set the live playback speed (0.25×–4×). Can be changed mid-battle.
+
+    Only scales the pacing of the WebSocket pipeline so the operator can watch
+    each step — attack/policy/risk logic is untouched.
+    """
+    _state["speed"] = body.speed
+    await get_container().ws_manager.broadcast({"event": "speed_changed", "speed": body.speed})
+    return {"status": "ok", "speed": body.speed}
 
 
 @router.post("/batch-battles")

@@ -18,7 +18,7 @@ import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Play, RotateCcw, Shield, RefreshCcw, Skull, Activity, Zap, Cpu,
-  Maximize2, Minimize2, Tag, X, Orbit,
+  Maximize2, Minimize2, Tag, X, Orbit, Gauge,
 } from 'lucide-react';
 
 import NavBar from '../components/NavBar';
@@ -115,6 +115,10 @@ export default function BattlePage() {
   const [performanceMode, setPerformanceMode] = useState(false);
   const [showLabels, setShowLabels] = useState(false);
   const [autoOrbit, setAutoOrbit] = useState(true);
+
+  // Live playback speed (0.5×–4×). Scales the backend pipeline pacing so the
+  // battle is actually watchable — does not change attack logic.
+  const [speed, setSpeed] = useState(1);
 
   // ── Hover / selection / tooltip overlay ─────────────────────────────────
   const [hovered, setHovered] = useState(null);     // { id, kind, x, y } (x,y wrapper-relative)
@@ -244,6 +248,8 @@ export default function BattlePage() {
         setShieldActive(false); setShieldRoundsLeft(0);
         addLog('Defense', '🔓 Shield expired', 'warning');
       }),
+
+      wsService.on('speed_changed', (data) => { if (data.speed) setSpeed(data.speed); }),
     ];
 
     return () => { unsubs.forEach((fn) => fn()); wsService.disconnect(); };
@@ -270,6 +276,7 @@ export default function BattlePage() {
       .then((s) => {
         if (s?.device_states) setDeviceStates(s.device_states);
         if (s?.llm?.active) setActiveProvider(s.llm.active);
+        if (s?.speed) setSpeed(s.speed);
       })
       .catch(() => {});
   }, []);
@@ -334,6 +341,19 @@ export default function BattlePage() {
       setTimeout(() => setRiskResetting(false), 8000);
     } catch { addLog('System', 'Countermeasures failed', 'error'); }
   }, [running, riskResetting, addLog]);
+
+  // Live playback-speed change — optimistic local update, POST to backend
+  // (works before and during a battle).
+  const handleSetSpeed = useCallback(async (value) => {
+    setSpeed(value);
+    try {
+      await fetch(`${API}/api/battle/speed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ speed: value }),
+      });
+    } catch { addLog('System', 'Speed change failed', 'error'); }
+  }, [addLog]);
 
   // ── 3D scene interactivity ──────────────────────────────────────────────
   const handleHover = useCallback((info) => {
@@ -408,6 +428,8 @@ export default function BattlePage() {
               className="wv-btn wv-btn-outline wv-btn-sm" style={{ flex: '0 0 auto' }}>
               <RefreshCcw size={13} /> {riskResetting ? b.deploying : b.counter}
             </button>
+
+            <SpeedControl speed={speed} onChange={handleSetSpeed} label={b.speed || 'Speed'} />
 
             <SceneToggle on={performanceMode} onClick={() => setPerformanceMode((v) => !v)}
               icon={Cpu} title="Toggle low-performance render (no post-FX, no reflections)">
@@ -529,6 +551,30 @@ export default function BattlePage() {
               <span style={{ opacity: 0.5 }}>·</span>
               <span>{riskLevel}</span>
             </div>
+
+            {/* Shield status indicator — shown whenever the dome is up */}
+            <AnimatePresence>
+              {shieldActive && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  style={{
+                    position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+                    zIndex: 21, padding: '6px 12px', borderRadius: 8,
+                    background: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(6px)',
+                    border: '1px solid var(--wv-green)',
+                    boxShadow: '0 0 16px var(--wv-green)',
+                    fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700,
+                    letterSpacing: '0.08em', color: 'var(--wv-green)',
+                    display: 'flex', gap: 7, alignItems: 'center',
+                  }}
+                >
+                  <Shield size={12} strokeWidth={2.5} />
+                  {(b.shieldActive || 'Shield · {rounds}r').replace('{rounds}', Math.max(shieldRoundsLeft, 0))}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Focus-mode mini controls */}
             {focusMode && (
@@ -685,6 +731,45 @@ function SceneToggle({ on, onClick, icon: Icon, title, children }) {
       title={title} style={{ flex: '0 0 auto' }}>
       <Icon size={13} /> {children}
     </button>
+  );
+}
+
+// ── Battle playback-speed selector (0.5× … 4×) ──────────────────────────────
+const SPEED_STEPS = [0.5, 1, 2, 4];
+function SpeedControl({ speed, onChange, label }) {
+  return (
+    <div
+      title="Battle playback speed — slow it down to watch each step, or speed it up"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, flex: '0 0 auto',
+        height: 32, padding: '0 8px', borderRadius: 8,
+        border: '1px solid var(--wv-border)', background: 'var(--wv-surface)',
+      }}
+    >
+      <Gauge size={13} style={{ color: 'var(--wv-text-2)', flex: '0 0 auto' }} />
+      <span className="wv-eyebrow" style={{ fontSize: 9 }}>{label}</span>
+      <div style={{ display: 'inline-flex', gap: 2 }}>
+        {SPEED_STEPS.map((s) => {
+          const active = Math.abs(speed - s) < 0.001;
+          return (
+            <button
+              key={s}
+              onClick={() => onChange(s)}
+              className="wv-mono"
+              style={{
+                cursor: 'pointer', border: 'none', borderRadius: 5,
+                padding: '3px 7px', fontSize: 11, fontWeight: 700,
+                background: active ? 'var(--wv-cyan)' : 'transparent',
+                color: active ? '#000' : 'var(--wv-text-2)',
+                transition: 'background 0.15s, color 0.15s',
+              }}
+            >
+              {s}×
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

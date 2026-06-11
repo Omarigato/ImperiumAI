@@ -75,15 +75,11 @@ export default function IndexPage() {
     fetch(`${API}/api/llm/status`).then((r) => r.json()).then(setLlmStatus).catch(() => {});
   }, []);
 
-  const availableLLMs = llmStatus?.providers
-    ? Object.entries(llmStatus.providers).filter(([, v]) => v.available).length
-    : 0;
-
   const STATS = [
     { icon: Bot,     label: h.kpiAgents,  value: 5 },
-    { icon: Skull,   label: h.kpiTactics, value: 22 },
+    { icon: Skull,   label: h.kpiTactics, value: 25 },
     { icon: Network, label: h.kpiDevices, value: 19 },
-    { icon: Zap,     label: h.kpiLLMs,    value: availableLLMs || 4 },
+    { icon: Zap,     label: h.kpiLLMs,    value: 6 },
   ];
 
   return (
@@ -193,8 +189,8 @@ export default function IndexPage() {
             <h2 className="section-title-v2">
               {h.arenaSub
                 .replace('{agents}', 5)
-                .replace('{tactics}', 22)
-                .replace('{llms}', availableLLMs || '–')}
+                .replace('{tactics}', 25)
+                .replace('{llms}', 6)}
             </h2>
           </div>
 

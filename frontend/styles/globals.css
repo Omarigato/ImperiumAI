@@ -1350,6 +1350,13 @@ html[data-theme='bw'] #__next {
 }
 [data-theme='bw'] .wv-btn-primary:hover { background: #222; }
 
+/* B/W mode: the WebGL scenes (battle 3D arena + landing hero) draw their own
+   hard-coded neon colours and ignore the CSS theme variables, so desaturate the
+   rendered canvas output to keep them grayscale like the rest of the UI. */
+[data-theme='bw'] canvas {
+  filter: grayscale(1) contrast(1.05);
+}
+
 .wv * { box-sizing: border-box; }
 
 /* ── Typography ───────────────────────────────────────────────────────────── */

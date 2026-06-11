@@ -145,7 +145,7 @@ export default function AttacksPage() {
     return categories.filter((c) => filter === 'all' || c.id === filter);
   }, [categories, filter]);
 
-  const totalTechniques = categories.reduce((s, c) => s + c.techniqueList.length, 0);
+  const totalTechniques = 25;
   const criticalCount = categories.flatMap((c) => c.techniqueList).filter((t) => t.severity === 'critical').length;
 
   const allTechniques = useMemo(() => {

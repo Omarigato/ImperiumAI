@@ -70,6 +70,7 @@
     "manual": "Manual",
     "perfHigh": "Perf: high",
     "perfLow": "Perf: low",
+    "speed": "Speed",
     "round": "Round",
     "breach": "BREACH",
     "block": "BLOCK",
@@ -521,7 +522,7 @@
     "skills": "Skills",
     "studentId": "ID",
     "info": {
-      "title": "Imperium AI — Smart Home Red Teaming Simulator",
+      "title": "Development of an AI-Based Red Teaming Framework for Testing LLMs Integrated into Smart Home and IoT Systems",
       "type": "Diploma Project",
       "year": "2026",
       "university": "International Information Technology University (IITU)",
@@ -529,16 +530,16 @@
     },
     "members": {
       "1": {
-        "role": "Project Lead & Full-Stack Developer",
-        "bio": "Project lead and main developer. Built Imperium AI — an interactive AI Red-Teaming Battle Simulator for smart-home security research. Specialises in AI systems, cybersecurity research, and interactive 3D visualisation."
+        "role": "Project Lead · System Architecture",
+        "bio": "Project lead. Designed the overall system architecture and the multi-agent red-team engine (5 adversarial agents), and mapped the 25 attack techniques to MITRE ATLAS. Specialises in AI systems and LLM security research."
       },
       "2": {
-        "role": "AI Red Team Analyst",
-        "bio": "Researches attack scenarios and agent strategies for the project. Focus: improving scenario quality, expanding the Learning Journey content, and making attack visualisation more practical. Specialises in prompt injection and context-poisoning research."
+        "role": "Frontend & Experimental Evaluation",
+        "bio": "Built the Next.js 14 + Three.js interface — the procedural 3D battle arena and analytics dashboard — ran the 40-battle experimental evaluation, and handled the Docker deployment to ai.imperium.kz."
       },
       "3": {
-        "role": "3D & IoT Prototype Developer",
-        "bio": "Responsible for 3D scenes, IoT object models and interactive prototype pages. Works on raising the realism of the smart-home visuals on the battle / view pages, and on a voice-driven IoT control prototype."
+        "role": "Backend & IoT Simulator",
+        "bio": "Built the FastAPI backend: the probabilistic policy engine, the 19-device IoT simulator, and the SQLAlchemy attack-memory layer. Specialises in backend architecture and IoT security."
       }
     }
   },

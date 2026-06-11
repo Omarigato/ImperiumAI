@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { Mail, Send, MapPin, GraduationCap, User, Code, Play } from 'lucide-react';
 import NavBar from '../components/NavBar';
 import { useLang } from '../contexts/LanguageContext';
-
 // Non-translatable team metadata — names (transliterated identifiers),
 // IDs, photo file ids, brand colour, skill tags, and contact info.
 // The translatable parts (role, bio) come from `t.team.members.<id>`.
@@ -14,7 +13,7 @@ const TEAM_META = [
     name:   'Аким Омар',
     nameEn: 'Akim Omar',
     studentId: '34732',
-    skills: ['Python', 'FastAPI', 'React', 'Next.js', 'Three.js', 'AI/ML', 'Cybersecurity', 'WebSocket'],
+    skills: ['System Architecture', 'Multi-Agent Engine', 'MITRE ATLAS', 'Python', 'FastAPI', 'LLM Security'],
     contacts: {
       email: '34732@iitu.edu.kz',
       telegram: '@Omarigato',
@@ -27,7 +26,7 @@ const TEAM_META = [
     name:   'Тажибаев Арнур',
     nameEn: 'Tazhibayev Arnur',
     studentId: 'IITU Student',
-    skills: ['Cybersecurity', 'Prompt Engineering', 'Threat Modeling', 'LLM Safety', 'IoT Security'],
+    skills: ['Next.js', 'React', 'Three.js', 'Experimental Evaluation', 'Docker', 'UI/UX'],
     contacts: {
       email: '35634@iitu.edu.kz',
       telegram: '@Arrnurrchiik',
@@ -37,10 +36,10 @@ const TEAM_META = [
   },
   {
     id: '3',
-    name:   'Кайсенов Жанторе',
-    nameEn: 'Kaisenov Zhantore',
+    name:   'Кайсанов Жанторе',
+    nameEn: 'Kaisanov Zhantore',
     studentId: 'IITU Student',
-    skills: ['Three.js', 'React', 'UI/UX', 'IoT Systems', 'Frontend Architecture'],
+    skills: ['FastAPI', 'Policy Engine', 'IoT Simulator', 'Python', 'SQLAlchemy', 'WebSocket'],
     contacts: {
       email: '34952@iitu.edu.kz',
       telegram: '@Zhantoreeee',
@@ -54,7 +53,7 @@ const TEAM_META = [
 const PROJECT_TECHS = [
   { name: 'Frontend',  tech: 'Next.js 14 + React 18 + Three.js + Framer Motion' },
   { name: 'Backend',   tech: 'FastAPI + Python + WebSocket' },
-  { name: 'AI/LLM',    tech: 'Groq (Llama 3.3) · Gemini · OpenRouter · GPT-4o' },
+  { name: 'AI/LLM',    tech: '6 providers — Groq · Gemini · OpenRouter · GPT-4o · DeepSeek · Simulation' },
   { name: '3D Scene',  tech: '@react-three/fiber + @react-three/drei + postprocessing' },
   { name: 'Analytics', tech: 'Recharts + Real-time WebSocket data' },
   { name: 'Security',  tech: 'Policy Engine + Risk Scoring + Stealth model' },
@@ -83,13 +82,12 @@ function MemberCard({ member, translated, index, skillsLabel }) {
           }}>
             {!photoError ? (
               <img
-                src={`/team/${member.id}.jpg`}
+                src={`/team/${member.id}.png`}
                 alt={member.nameEn}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 onError={() => setPhotoError(true)}
               />
-            ) : (
-              <User size={36} color={member.color} strokeWidth={1.5} />
+            ) : (              <User size={36} color={member.color} strokeWidth={1.5} />
             )}
           </div>
 
