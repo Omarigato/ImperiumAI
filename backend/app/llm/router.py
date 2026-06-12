@@ -162,7 +162,7 @@ class _OpenAICompatClient(BaseLLMClient):
                     kwargs["base_url"] = self.base_url
                 if self.extra_headers:
                     kwargs["default_headers"] = self.extra_headers
-                self._client = OpenAI(**kwargs)
+                self._client = OpenAI(**kwargs, timeout=10.0)
                 self.available = True
                 logger.info("%s client ready", self.provider.value)
             except Exception as exc:
@@ -249,7 +249,9 @@ class GeminiClient(BaseLLMClient):
         if not self._model:
             return SimulationClient().execute_command(prompt)
         try:
-            result = self._model.generate_content(prompt)
+            result = self._model.generate_content(
+                prompt, request_options={"timeout": 10}
+            )
             return self._defaults(self._parse(result.text))
         except Exception as exc:
             logger.error("Gemini error: %s", exc)
@@ -371,13 +373,13 @@ class LLMRouter:
 
     @staticmethod
     def _is_auth_error(result: dict) -> bool:
-        """True for permanent auth failures — bad key, IP block, no balance."""
+        """True for failures where retrying won't help this session."""
         response = result.get("response", "").lower()
         signals = [
-            "401", "403", "402",
+            "401", "402", "403", "429",
             "api key not found", "user not found", "access denied",
             "invalid_api_key", "api_key_invalid", "insufficient balance",
-            "authentication", "unauthorized",
+            "quota", "rate limit", "authentication", "unauthorized",
         ]
         return any(s in response for s in signals)
 
